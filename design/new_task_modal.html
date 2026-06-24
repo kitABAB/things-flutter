@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>新建任务 · 模态(白纸 · 高度自适应)</title>
+<style>
+  :root {
+    --blue: #5B8DEF; --today: #FAC51C; --red: #E5564E; --teal: #21B5A8;
+    --beige: #B7935A; --text: #1c1c1e; --text2: #8a8a8e; --line: #ececec; --card: #fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text); min-height: 100vh; background: #d9d9dc;
+    display: flex; flex-direction: column; align-items: center; padding: 26px 16px 60px; gap: 18px;
+  }
+  h1 { font-size: 19px; font-weight: 700; }
+  .sub { color: #6a6a6f; font-size: 13px; margin-top: -12px; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .caption { font-size: 12.5px; font-weight: 700; color: #6a6a6f; }
+
+  /* 桌面窗口衬底 */
+  .desktop { position: relative; width: 880px; max-width: 100%; height: 520px; border-radius: 16px;
+    overflow: hidden; background: #ececed; box-shadow: 0 22px 64px rgba(0,0,0,0.20); border: 1px solid #c9c9ce; }
+  .listbg { position: absolute; inset: 0; padding: 38px 56px; filter: saturate(.96); }
+  .listbg .vtitle { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .listbg .vtitle .star { color: var(--today); font-size: 28px; }
+  .listbg .vtitle h2 { font-size: 28px; font-weight: 800; }
+  .lrow { display: flex; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid #e2e2e5; max-width: 520px; }
+  .lcbox { width: 20px; height: 20px; border: 1.6px solid #c9c9cf; border-radius: 6px; flex: none; }
+  .lrow span { font-size: 15.5px; color: #2c2c2e; } .lrow .muted { color: var(--text2); }
+
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.30); backdrop-filter: blur(2.5px);
+    display: flex; align-items: center; justify-content: center; }
+
+  /* ===== 模态:宽 600,高度自适应,超过上限才滚动 ===== */
+  .modal {
+    width: 600px; max-width: calc(100% - 32px);
+    height: auto;                       /* 高度随内容 */
+    max-height: min(560px, 82vh);       /* 上限,超过才滚 */
+    background: var(--card); border-radius: 20px;
+    box-shadow: 0 30px 70px rgba(0,0,0,0.30), 0 4px 14px rgba(0,0,0,0.10);
+    display: flex; flex-direction: column; overflow: hidden;
+    animation: pop .24s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop { from {opacity:0; transform: translateY(10px) scale(.97);} to {opacity:1; transform:none;} }
+
+  .head { padding: 26px 30px 6px; display: flex; gap: 15px; align-items: flex-start; flex: none; }
+  .cbox { width: 26px; height: 26px; border: 1.8px solid #c6c6cc; border-radius: 7px; flex: none; margin-top: 3px; }
+  .head input { border: none; outline: none; background: transparent; width: 100%;
+    font-size: 23px; font-weight: 600; color: var(--text); line-height: 1.35; }
+  .head input::placeholder { color: #c2c2c8; font-weight: 600; }
+
+  .body { flex: 1 1 auto; overflow-y: auto; padding: 0 30px; min-height: 0; }
+  .body::-webkit-scrollbar { width: 9px; }
+  .body::-webkit-scrollbar-thumb { background: #d6d6db; border-radius: 6px; border: 2px solid #fff; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 16px 41px; }
+  .chips:empty { display: none; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 20px; }
+  .chip .x { opacity:.55; font-weight: 700; cursor: pointer; }
+  .chip.when { color: var(--today); background: rgba(250,197,28,.15); }
+  .chip.dead { color: var(--red); background: rgba(229,86,78,.12); }
+  .chip.tag  { color: var(--teal); background: rgba(33,181,168,.12); }
+
+  .foot { flex: none; border-top: 1px solid var(--line); padding: 12px 22px; display: flex; align-items: center; gap: 4px; }
+  .tool { display: inline-flex; align-items: center; gap: 7px; flex: none; white-space: nowrap; border: none;
+    background: transparent; cursor: pointer; color: var(--text2); font-size: 13.5px; font-weight: 600;
+    padding: 9px 11px; border-radius: 10px; transition: .15s; }
+  .tool:hover { background: #f1f1f4; color: #5a5a5f; }
+  .tool .ico { font-size: 18px; line-height: 1; } .tool.icononly { padding: 9px 10px; }
+  .tool.list { color: var(--blue); background: rgba(91,141,239,.10); }
+  .tool.list:hover { background: rgba(91,141,239,.18); }
+  .spacer { flex: 1; }
+  .save { border: none; background: var(--blue); color: #fff; cursor: pointer; font-size: 14.5px;
+    font-weight: 700; padding: 10px 24px; border-radius: 11px; transition: .15s; }
+  .save:hover { filter: brightness(1.05); } .save:disabled { background: #cfd8ee; cursor: default; }
+
+  .pop { position: absolute; background: #fff; border-radius: 14px; box-shadow: 0 16px 44px rgba(0,0,0,0.24);
+    padding: 6px; min-width: 196px; display: none; z-index: 40; }
+  .pop.open { display: block; animation: pop .15s ease; }
+  .pop .opt { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border-radius: 9px; cursor: pointer; font-size: 14px; }
+  .pop .opt:hover { background: #f3f3f6; } .pop .opt .dot { width: 18px; text-align: center; }
+  .pop .sep { height: 1px; background: var(--line); margin: 5px 8px; }
+  .pop .ghdr { font-size: 11px; font-weight: 700; color: var(--text2); padding: 7px 13px 3px; text-transform: uppercase; letter-spacing:.4px; }
+
+  .notes { width: 880px; max-width: 100%; display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+  .note { display: flex; gap: 10px; font-size: 13px; color: #2c2c2e; line-height: 1.5; }
+  .note b { color: var(--blue); } .dim { color: var(--text2); }
+  .badge { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--blue); color:#fff; font-size: 12px; font-weight: 700; display:flex; align-items:center; justify-content:center; }
+  .hint { font-size: 12px; color: #6a6a6f; text-align: center; }
+  kbd { background:#fff; border:1px solid #ccc; border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:11px; font-family:inherit; }
+</style>
+</head>
+<body>
+  <h1>新建任务 · 居中模态(白纸 · 高度自适应)</h1>
+  <p class="sub">宽 600,高度随内容;白纸时小巧,内容多到上限才滚动。检查项只在详情页。</p>
+
+  <div class="desktop" id="desktop">
+    <div class="listbg">
+      <div class="vtitle"><span class="star">★</span><h2>今天</h2></div>
+      <div class="lrow"><div class="lcbox"></div><span>给设计稿做最后走查</span></div>
+      <div class="lrow"><div class="lcbox"></div><span>回复客户邮件 <span class="muted">· 工作</span></span></div>
+      <div class="lrow"><div class="lcbox"></div><span>预约牙医</span></div>
+    </div>
+
+    <div class="scrim" id="scrim">
+      <div class="modal" id="modal" onclick="event.stopPropagation()">
+        <div class="head">
+          <div class="cbox"></div>
+          <input id="title" placeholder="新建任务" autocomplete="off" />
+        </div>
+        <div class="body"><div class="chips" id="chips"></div></div>
+        <div class="foot">
+          <button class="tool list" id="btnList"><span class="ico">📥</span><span id="listLabel">收件箱</span></button>
+          <button class="tool icononly" id="btnWhen" title="何时"><span class="ico">🗓</span></button>
+          <button class="tool icononly" id="btnDead" title="死线"><span class="ico">🏳</span></button>
+          <button class="tool icononly" id="btnTag" title="标签"><span class="ico">#</span></button>
+          <span class="spacer"></span>
+          <button class="save" id="save" disabled>保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="pop" id="popList" style="left:300px; top:300px;">
+      <div class="ghdr">放到哪里</div>
+      <div class="opt" data-list="收件箱"><span class="dot" style="color:var(--blue)">📥</span>收件箱</div>
+      <div class="opt" data-list="今天"><span class="dot" style="color:var(--today)">★</span>今天</div>
+      <div class="sep"></div>
+      <div class="ghdr">项目</div>
+      <div class="opt" data-list="网站改版"><span class="dot" style="color:var(--blue)">◔</span>网站改版</div>
+      <div class="opt" data-list="读书计划"><span class="dot" style="color:var(--blue)">◑</span>读书计划</div>
+      <div class="sep"></div>
+      <div class="ghdr">领域</div>
+      <div class="opt" data-list="工作"><span class="dot">▦</span>工作</div>
+      <div class="opt" data-list="个人"><span class="dot">▦</span>个人</div>
+    </div>
+    <div class="pop" id="popWhen" style="left:352px; top:300px;">
+      <div class="opt" data-when="今天"><span class="dot" style="color:var(--today)">★</span>今天</div>
+      <div class="opt" data-when="今晚"><span class="dot" style="color:var(--today)">🌙</span>今晚</div>
+      <div class="opt" data-when="随时"><span class="dot" style="color:var(--teal)">▤</span>随时</div>
+      <div class="opt" data-when="将来"><span class="dot" style="color:var(--beige)">📦</span>将来</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><span class="badge">1</span><div><b>白纸态</b>:打开只有标题 + 一条安静工具条,卡片很矮、聚焦书写。</div></div>
+    <div class="note"><span class="badge">2</span><div><b>高度自适应</b>:加了 chips(何时/死线/标签)卡片才长高;到 <code>min(560px,82vh)</code> 上限才出现滚动。</div></div>
+    <div class="note"><span class="badge">3</span><div><b>检查项</b>不在这里,贴近 Things——只在<b>任务详情页</b>里加。<span class="dim">备注已移除。</span></div></div>
+  </div>
+  <p class="hint">原型仅用于设计评审 · <kbd>Enter</kbd> 保存 · <kbd>Esc</kbd> / 点遮罩取消</p>
+
+<script>
+  const title = document.getElementById('title');
+  const chips = document.getElementById('chips');
+  const save = document.getElementById('save');
+  const listLabel = document.getElementById('listLabel');
+  const state = { when: null, dead: null, tag: null, list: '收件箱' };
+
+  function renderChips() {
+    chips.innerHTML = '';
+    if (state.when) chips.insertAdjacentHTML('beforeend', `<span class="chip when">🗓 ${state.when}<span class="x" data-clr="when">×</span></span>`);
+    if (state.dead) chips.insertAdjacentHTML('beforeend', `<span class="chip dead">🏳 ${state.dead}<span class="x" data-clr="dead">×</span></span>`);
+    if (state.tag) chips.insertAdjacentHTML('beforeend', `<span class="chip tag"># ${state.tag}<span class="x" data-clr="tag">×</span></span>`);
+    chips.querySelectorAll('.x').forEach(x => x.onclick = () => { state[x.dataset.clr] = null; renderChips(); });
+  }
+  function refreshSave() { save.disabled = title.value.trim() === ''; }
+  title.addEventListener('input', refreshSave);
+
+  function closeAllPops() { document.querySelectorAll('.pop').forEach(p => p.classList.remove('open')); }
+  function togglePop(id) { const p = document.getElementById(id); const was = p.classList.contains('open'); closeAllPops(); if (!was) p.classList.add('open'); }
+  document.getElementById('btnList').onclick = e => { e.stopPropagation(); togglePop('popList'); };
+  document.getElementById('btnWhen').onclick = e => { e.stopPropagation(); togglePop('popWhen'); };
+  document.getElementById('btnDead').onclick = e => { e.stopPropagation(); closeAllPops(); state.dead = '周五'; renderChips(); };
+  document.getElementById('btnTag').onclick = e => { e.stopPropagation(); closeAllPops(); state.tag = '工作'; renderChips(); };
+  document.querySelectorAll('#popList .opt').forEach(o => o.onclick = () => { state.list = o.dataset.list; listLabel.textContent = o.dataset.list; closeAllPops(); });
+  document.querySelectorAll('#popWhen .opt').forEach(o => o.onclick = () => { state.when = o.dataset.when; renderChips(); closeAllPops(); });
+
+  document.getElementById('scrim').onclick = () => closeAllPops();
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAllPops();
+    if (e.key === 'Enter' && document.activeElement === title && !save.disabled) save.click();
+  });
+  save.onclick = () => { if (!save.disabled) flash('已保存 ✓'); };
+  let toast;
+  function flash(msg) {
+    if (toast) toast.remove();
+    toast = document.createElement('div'); toast.textContent = msg;
+    toast.style.cssText = 'position:absolute;left:50%;top:26px;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:10px 20px;border-radius:22px;font-size:13.5px;font-weight:600;z-index:60;animation:pop .2s ease';
+    document.getElementById('desktop').appendChild(toast);
+    setTimeout(() => { if (toast) { toast.remove(); toast = null; } }, 1400);
+  }
+  refreshSave(); renderChips();
+  setTimeout(() => title.focus(), 200);
+</script>
+</body>
+</html>

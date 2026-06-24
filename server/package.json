@@ -1,0 +1,16 @@
+{
+  "name": "things-sync-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted sync backend for the Things 3 clone (timestamp last-write-wins + tombstones). Zero native deps, JSON-file persisted.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
