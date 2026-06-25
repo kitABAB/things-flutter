@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>今日小组件 · 标签筛选交互</title>
+<style>
+  :root{
+    --blue:#2D7DF6; --amber:#F5B301; --red:#E5484D;
+    --text:#15151A; --text2:#9A9AA2; --line:#EEEEF1; --fill:#F4F4F6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh; padding:40px 28px 50px;
+    background:radial-gradient(1200px 700px at 20% -5%,#2b3350 0%,#1a1f33 45%,#12152300 100%),#0d0f17;
+    color:#fff; display:flex; flex-direction:column; align-items:center;
+  }
+  h1{font-size:20px;font-weight:800}
+  .lead{color:#aeb4c7;font-size:13px;max-width:720px;text-align:center;line-height:1.6;margin:8px 0 26px}
+  .lead b{color:#fff}
+
+  .flow{display:flex;align-items:center;gap:18px;flex-wrap:wrap;justify-content:center}
+  .col{display:flex;flex-direction:column;align-items:center;gap:11px}
+  .arrow{display:flex;flex-direction:column;align-items:center;gap:4px;color:#7d86a3}
+  .arrow svg{width:26px;height:26px}
+  .arrow span{font-size:11px;font-weight:700;color:#9aa3bd;white-space:nowrap}
+
+  .cap{text-align:center}
+  .cap .k{font-size:13px;font-weight:800}
+  .cap .v{font-size:11px;color:#aeb4c7;margin-top:3px;max-width:230px}
+
+  /* —— 小组件外观 —— */
+  .widget{width:300px;background:#fff;border-radius:24px;box-shadow:0 12px 30px rgba(20,28,50,.45), inset 0 0 0 1px rgba(0,0,0,.03);overflow:hidden;padding:14px 15px 12px;display:flex;flex-direction:column}
+  .whead{display:flex;align-items:center;gap:8px;padding-bottom:9px}
+  .whead .star{width:18px;height:18px;color:var(--amber);flex:none}
+  .whead h2{font-size:16px;font-weight:800;color:var(--text)}
+  .whead .spacer{margin-left:auto}
+  .funnel{width:30px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text2)}
+  .funnel svg{width:15px;height:15px}
+  .funnel.on{background:rgba(45,125,246,.12);color:var(--blue)}
+  .ring{display:flex;align-items:center;gap:6px;margin-left:6px}
+  .ringsvg{width:21px;height:21px;transform:rotate(-90deg)}
+  .ring .cnt{font-size:12.5px;font-weight:700;color:var(--text2)}
+  .ring .cnt b{color:var(--text)}
+
+  /* 已选筛选标识（替代进度环位置） */
+  .activeTag{margin-left:6px;display:flex;align-items:center;gap:5px;background:var(--blue);color:#fff;border-radius:20px;padding:4px 8px 4px 9px;font-size:11.5px;font-weight:700}
+  .activeTag .x{width:13px;height:13px;opacity:.9}
+
+  /* 标签 chip 行 */
+  .tagrow{display:flex;gap:7px;padding:2px 1px 9px;overflow:hidden;position:relative}
+  .chip{font-size:11.5px;font-weight:700;color:#6b6b73;background:var(--fill);border-radius:20px;padding:5px 11px;white-space:nowrap;flex:none}
+  .chip.sel{background:var(--blue);color:#fff}
+  .chip.all{color:#6b6b73}
+  .fade{position:absolute;right:0;top:0;bottom:9px;width:34px;background:linear-gradient(90deg,#fff0,#fff)}
+
+  .row{display:flex;align-items:center;gap:10px;padding:6px 2px}
+  .cbox{width:19px;height:19px;border-radius:6px;border:1.7px solid #CFCFD6;flex:none;display:flex;align-items:center;justify-content:center}
+  .cbox.on{background:var(--blue);border-color:var(--blue)}
+  .cbox svg{width:11px;height:11px}
+  .row .t{font-size:13.5px;font-weight:500;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row.done .t{color:var(--text2);text-decoration:line-through}
+  .row .flag{width:13px;height:13px;color:var(--red);flex:none}
+  .row .mini{font-size:10.5px;font-weight:700;color:#b9b9c0;flex:none}
+
+  .addpill{margin-top:8px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;background:var(--fill)}
+  .addpill .pl{width:15px;height:15px;color:var(--blue);flex:none}
+  .addpill span{font-size:12.5px;font-weight:600;color:var(--text2)}
+
+  .notes{max-width:760px;display:flex;flex-direction:column;gap:11px;margin-top:30px}
+  .note{display:flex;gap:11px;font-size:12.5px;color:#c9cddb;line-height:1.55}
+  .note .n{flex:none;width:21px;height:21px;border-radius:50%;background:#ffffff1a;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .note b{color:#fff}
+  .hint{font-size:11.5px;color:#8b93ab;margin-top:14px;text-align:center}
+</style>
+</head>
+<body>
+  <h1>今日小组件 · 标签筛选交互</h1>
+  <p class="lead">默认保持紧凑(漏斗收起)。点<b>漏斗</b>滑出情境标签行,选一个就<b>就地过滤</b>今日清单,头部显示当前筛选并可一键 <b>✕</b> 清除。与 App 列表顶部的标签过滤同源、同为单选。</p>
+
+  <div class="flow">
+    <!-- 态1：默认收起 -->
+    <div class="col">
+      <div class="widget">
+        <div class="whead">
+          <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+          <h2>今天</h2>
+          <span class="spacer"></span>
+          <div class="funnel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></div>
+          <div class="ring">
+            <svg class="ringsvg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#ECECEF" stroke-width="4"/><circle cx="18" cy="18" r="15" fill="none" stroke="#2D7DF6" stroke-width="4" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="56.5"/></svg>
+            <span class="cnt"><b>2</b>/5</span>
+          </div>
+        </div>
+        <div class="row done"><div class="cbox on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></div><span class="t">回复设计稿反馈</span></div>
+        <div class="row"><div class="cbox"></div><span class="t">完善项目计划书</span><svg class="flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 21V4h11l-2 3.5L17 11H6"/></svg></div>
+        <div class="row"><div class="cbox"></div><span class="t">给团队发周报</span></div>
+        <div class="addpill"><svg class="pl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>快速添加到收件箱…</span></div>
+      </div>
+      <div class="cap"><div class="k">① 默认 · 紧凑</div><div class="v">漏斗收起,和上版一样干净</div></div>
+    </div>
+
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>点漏斗</span></div>
+
+    <!-- 态2：展开标签 -->
+    <div class="col">
+      <div class="widget">
+        <div class="whead">
+          <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+          <h2>今天</h2>
+          <span class="spacer"></span>
+          <div class="funnel on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg></div>
+          <div class="ring"><span class="cnt"><b>2</b>/5</span></div>
+        </div>
+        <div class="tagrow">
+          <span class="chip all sel">全部</span>
+          <span class="chip">#在电脑前</span>
+          <span class="chip">#外出</span>
+          <span class="chip">#电话</span>
+          <span class="fade"></span>
+        </div>
+        <div class="row"><div class="cbox"></div><span class="t">完善项目计划书</span><svg class="flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 21V4h11l-2 3.5L17 11H6"/></svg></div>
+        <div class="row"><div class="cbox"></div><span class="t">给团队发周报</span></div>
+        <div class="addpill"><svg class="pl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>快速添加到收件箱…</span></div>
+      </div>
+      <div class="cap"><div class="k">② 展开 · 情境标签</div><div class="v">横向滑动选标签,只列出今日里出现过的</div></div>
+    </div>
+
+    <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg><span>选 #在电脑前</span></div>
+
+    <!-- 态3：已筛选 -->
+    <div class="col">
+      <div class="widget">
+        <div class="whead">
+          <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+          <h2>今天</h2>
+          <span class="spacer"></span>
+          <div class="activeTag">#在电脑前
+            <svg class="x" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </div>
+        </div>
+        <div class="tagrow">
+          <span class="chip all">全部</span>
+          <span class="chip sel">#在电脑前</span>
+          <span class="chip">#外出</span>
+          <span class="chip">#电话</span>
+          <span class="fade"></span>
+        </div>
+        <div class="row"><div class="cbox"></div><span class="t">完善项目计划书</span><svg class="flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 21V4h11l-2 3.5L17 11H6"/></svg></div>
+        <div class="row"><div class="cbox"></div><span class="t">给团队发周报</span></div>
+        <div class="addpill"><svg class="pl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>快速添加到收件箱…</span></div>
+      </div>
+      <div class="cap"><div class="k">③ 已筛选 · #在电脑前</div><div class="v">只剩带该标签的任务,头部 ✕ 一键清除</div></div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><span class="n">1</span><div><b>同源</b>:标签行只列出「今日清单里实际出现过的标签」(含从项目/区域<b>继承</b>的),和 App 列表顶部 <code>_tagBar</code> 完全一致,单选过滤。</div></div>
+    <div class="note"><span class="n">2</span><div><b>就地刷新</b>:点 chip → 后台广播 <code>todaywidget://filter?tag=…</code> → 重算过滤后的今日清单回写,不打开 App。当前筛选记在 widget 状态里,下次点开仍保留。</div></div>
+    <div class="note"><span class="n">3</span><div><b>保持紧凑</b>:默认漏斗收起(态①与上版一致);只有想筛时才展开标签行,多占一行高度。若你常用筛选,也可让标签行常驻。</div></div>
+    <div class="note"><span class="n">4</span><div><b>清除</b>:点头部蓝标 <b>✕</b>、或点「全部」、或再点一次选中的 chip,都回到全部。</div></div>
+  </div>
+  <p class="hint">注:Android 小组件无下拉浮层,故用「漏斗展开 + 横滑 chips」承载筛选;复杂多选/标签管理仍回 App。</p>
+</body>
+</html>

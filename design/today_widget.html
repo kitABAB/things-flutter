@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>今日小组件 · 高保真原型</title>
+<style>
+  :root {
+    --blue:#2D7DF6; --today:#FAC51C; --evening:#5B6CF0; --red:#E5484D;
+    --beige:#B7935A; --text:#1A1A1A; --text2:#8E8E93; --line:#ECECEF;
+    --card:rgba(255,255,255,0.86); --cardSolid:#fff;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--text); min-height:100vh; padding:34px 18px 70px;
+    background:linear-gradient(135deg,#aebfe6 0%,#c8d2ee 38%,#e9d9c4 100%);
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+  }
+  h1 { font-size:19px; font-weight:800; color:#2a2a33; }
+  .sub { color:#54545e; font-size:13px; margin-top:-8px; text-align:center; max-width:560px; line-height:1.5; }
+
+  .stage { display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:center; gap:26px; margin-top:8px; }
+  .label { text-align:center; font-size:12px; font-weight:700; color:#5b5b66; margin-top:10px; letter-spacing:.3px; }
+
+  /* —— 通用小组件外观（毛玻璃） —— */
+  .widget {
+    background:var(--card); backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+    border-radius:22px; box-shadow:0 12px 34px rgba(40,55,90,.20), inset 0 0 0 .5px rgba(255,255,255,.6);
+    overflow:hidden;
+  }
+
+  /* —— 小尺寸 —— */
+  .w-small { width:158px; height:158px; padding:16px; display:flex; flex-direction:column; position:relative; }
+  .w-small .star { font-size:18px; }
+  .w-small .num { font-size:54px; font-weight:800; line-height:1; margin-top:auto; letter-spacing:-2px; }
+  .w-small .cap { font-size:13px; color:var(--text2); font-weight:600; margin-top:4px; }
+  .w-small .add { position:absolute; right:14px; bottom:14px; width:34px; height:34px; border-radius:50%;
+    background:var(--blue); color:#fff; display:flex; align-items:center; justify-content:center; font-size:22px;
+    box-shadow:0 4px 12px rgba(45,125,246,.45); cursor:pointer; transition:transform .12s; }
+  .w-small .add:active { transform:scale(.9); }
+
+  /* —— 中尺寸（可交互主角） —— */
+  .w-mid { width:340px; padding:15px 16px 13px; display:flex; flex-direction:column; }
+  .w-lg  { width:340px; padding:15px 16px 13px; display:flex; flex-direction:column; }
+
+  .whead { display:flex; align-items:center; gap:9px; padding:2px 4px 11px; }
+  .whead .star { color:var(--today); font-size:19px; }
+  .whead h2 { font-size:18px; font-weight:800; }
+  .whead .count { margin-left:auto; font-size:13.5px; font-weight:700; color:var(--text2); }
+  .whead .count b { color:var(--today); }
+
+  .subhead { font-size:11.5px; font-weight:800; color:var(--text2); letter-spacing:.5px; padding:8px 4px 4px; display:flex; align-items:center; gap:6px; }
+  .subhead .moon { color:var(--evening); }
+
+  .task { display:flex; align-items:center; gap:11px; padding:8px 4px; border-radius:10px; cursor:pointer; transition:.18s; }
+  .task:hover { background:rgba(120,130,160,.10); }
+  .cbox { width:21px; height:21px; border-radius:6px; border:1.8px solid #c4c4cc; flex:none; display:flex; align-items:center; justify-content:center; transition:.16s; }
+  .cbox svg { width:13px; height:13px; opacity:0; transform:scale(.5); transition:.16s; }
+  .task.done .cbox { background:var(--blue); border-color:var(--blue); }
+  .task.done .cbox svg { opacity:1; transform:scale(1); }
+  .task .t { font-size:14.5px; font-weight:500; flex:1; transition:.18s; }
+  .task.done .t { color:var(--text2); text-decoration:line-through; }
+  .flag { color:var(--red); font-size:13px; flex:none; }
+  .task.removing { opacity:0; transform:translateX(20px); height:0; padding:0; overflow:hidden; }
+
+  .cal { display:flex; align-items:center; gap:10px; padding:9px 11px; margin:4px 0; border-radius:11px; background:rgba(120,130,160,.10); }
+  .cal .ic { color:var(--text2); font-size:14px; }
+  .cal .cttl { font-size:13.5px; font-weight:600; }
+  .cal .csub { font-size:11px; color:var(--text2); }
+
+  .divider { height:1px; background:var(--line); margin:6px 2px; }
+
+  /* —— 行内快速添加 —— */
+  .addbar { margin-top:8px; display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:13px;
+    background:rgba(120,130,160,.10); cursor:text; transition:.18s; border:1.5px solid transparent; }
+  .addbar.focus { background:var(--cardSolid); border-color:rgba(45,125,246,.5); box-shadow:0 4px 16px rgba(45,125,246,.12); }
+  .addbar .plus { color:var(--text2); font-size:18px; font-weight:600; flex:none; transition:.18s; }
+  .addbar.focus .plus { color:var(--blue); }
+  .addbar input { border:none; outline:none; background:transparent; flex:1; font-size:14px; font-weight:500; color:var(--text); }
+  .addbar input::placeholder { color:var(--text2); }
+  .spark { flex:none; width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    color:var(--blue); font-size:16px; cursor:pointer; opacity:.45; transition:.18s; }
+  .addbar.focus .spark { opacity:1; background:rgba(45,125,246,.10); }
+  .spark:active { transform:scale(.88); }
+
+  /* 自然语言识别提示气泡 */
+  .nl { font-size:11.5px; color:var(--blue); font-weight:600; padding:2px 4px 0 40px; height:0; overflow:hidden; transition:.18s; }
+  .nl.show { height:18px; }
+
+  /* 空态 */
+  .empty { text-align:center; padding:24px 10px 18px; }
+  .empty .big { font-size:30px; }
+  .empty .msg { font-size:13.5px; color:var(--text2); font-weight:600; margin-top:6px; }
+
+  .notes { width:100%; max-width:620px; display:flex; flex-direction:column; gap:9px; margin-top:18px; }
+  .note { display:flex; gap:11px; font-size:13px; color:#33333a; line-height:1.55; align-items:flex-start; }
+  .badge { flex:none; width:22px; height:22px; border-radius:50%; background:var(--blue); color:#fff; font-size:11.5px; font-weight:800; display:flex; align-items:center; justify-content:center; margin-top:1px; }
+  .note b { color:#1a1a1a; }
+  kbd { background:#fff; border:1px solid #ccc; border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:11px; }
+
+  .toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px); opacity:0;
+    background:#1c1c1e; color:#fff; padding:11px 20px; border-radius:22px; font-size:13.5px; font-weight:600;
+    transition:.25s; z-index:50; pointer-events:none; }
+  .toast.show { transform:translateX(-50%); opacity:1; }
+</style>
+</head>
+<body>
+  <h1>今日小组件 · 高保真原型</h1>
+  <p class="sub">两个核心：一眼看到此刻要做什么 · 不打开 App 就能加任务。中尺寸为可交互主角——试试勾选、点击 <b>＋ 添加到今天</b>、输入「明天 健身」、点 <b>✨</b>。</p>
+
+  <div class="stage">
+    <!-- 小尺寸 -->
+    <div>
+      <div class="widget w-small">
+        <div class="star">⭐️</div>
+        <div class="num" id="smallNum">3</div>
+        <div class="cap">今天待办</div>
+        <div class="add" onclick="focusAdd()">+</div>
+      </div>
+      <div class="label">小 · 一眼计数 + 速记</div>
+    </div>
+
+    <!-- 中尺寸：可交互 -->
+    <div>
+      <div class="widget w-mid">
+        <div class="whead">
+          <span class="star">★</span><h2>今天</h2>
+          <span class="count"><b id="doneN">2</b>/<span id="totalN">5</span></span>
+        </div>
+        <div id="list"></div>
+        <div class="addbar" id="addbar" onclick="focusAdd()">
+          <span class="plus">+</span>
+          <input id="addInput" placeholder="添加到今天…" autocomplete="off" />
+          <div class="spark" id="spark" title="一句话拆解" onclick="sparkle(event)">✨</div>
+        </div>
+        <div class="nl" id="nl"></div>
+      </div>
+      <div class="label">中 · 今日清单 + 行内快速添加</div>
+    </div>
+
+    <!-- 大尺寸 -->
+    <div>
+      <div class="widget w-lg">
+        <div class="whead">
+          <span class="star">★</span><h2>今天</h2>
+          <span class="count"><b>2</b>/5</span>
+        </div>
+        <div class="task done"><div class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></div><span class="t">回复设计稿反馈</span></div>
+        <div class="task"><div class="cbox"></div><span class="t">完善项目计划书</span><span class="flag">⚑</span></div>
+        <div class="task"><div class="cbox"></div><span class="t">锻炼身体 30 分钟</span></div>
+        <div class="subhead"><span class="moon">🌙</span>今晚</div>
+        <div class="task"><div class="cbox"></div><span class="t">阅读《深度工作》第 3 章</span></div>
+        <div class="task"><div class="cbox"></div><span class="t">准备明天的演示文稿</span></div>
+        <div class="cal"><span class="ic">📅</span><div><div class="cttl">21:00 与产品团队同步</div><div class="csub">日历事件 · 只读</div></div></div>
+        <div class="addbar"><span class="plus">+</span><input placeholder="添加到今天…" readonly /><div class="spark">✨</div></div>
+      </div>
+      <div class="label">大 · 今天 + 今晚 + 日历编织</div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note"><span class="badge">1</span><div><b>看</b>：默认就是「今天」的派生清单——被安排到今天的任务 + 临近死线（红旗）+ 今晚分组 + 只读日历事件，与 App 主视图同源。</div></div>
+    <div class="note"><span class="badge">2</span><div><b>记</b>：点 <b>＋</b> 行内展开输入，回车即落「今天」。支持自然语言——输入「明天 / 周五 8pm」会实时识别为日期并提示（复用 App 的 <code>natural_date</code>）。</div></div>
+    <div class="note"><span class="badge">3</span><div><b>拆</b>：长句点 <b>✨</b> 唤起「一句话拆解」，跳进 App 的草稿评审框（小组件本身不承载复杂编辑，保持轻）。</div></div>
+    <div class="note"><span class="badge">4</span><div><b>勾</b>：点复选框就地完成，划线 + 渐隐移出，计数实时更新；清零后显示庆祝空态。点任务文字则跳转 App 详情。</div></div>
+  </div>
+  <p class="sub" style="margin-top:6px"><kbd>Enter</kbd> 添加 · 桌面端同一设计可作悬浮便签；移动端为主屏小组件（点击多跳转 App，受系统交互限制）。</p>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const seed = [
+    { t:'回复设计稿反馈', done:true },
+    { t:'完善项目计划书', flag:true },
+    { t:'锻炼身体 30 分钟' },
+  ];
+  let tasks = seed.map((x,i)=>({id:i, ...x}));
+  let uid = 100;
+
+  const list = document.getElementById('list');
+  const addbar = document.getElementById('addbar');
+  const input = document.getElementById('addInput');
+  const nl = document.getElementById('nl');
+
+  function render() {
+    list.innerHTML = '';
+    if (tasks.length === 0) {
+      list.innerHTML = '<div class="empty"><div class="big">🎉</div><div class="msg">今天清零，去享受生活吧</div></div>';
+    }
+    tasks.forEach(task => {
+      const row = document.createElement('div');
+      row.className = 'task' + (task.done ? ' done' : '');
+      row.innerHTML =
+        '<div class="cbox"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></div>' +
+        '<span class="t">'+escapeHtml(task.t)+'</span>' +
+        (task.flag ? '<span class="flag">⚑</span>' : '');
+      row.querySelector('.cbox').onclick = (e)=>{ e.stopPropagation(); toggle(task.id, row); };
+      row.querySelector('.t').onclick = ()=> flash('打开任务详情 →（跳转 App）');
+      list.appendChild(row);
+    });
+    updateCount();
+  }
+
+  function updateCount() {
+    const done = tasks.filter(t=>t.done).length;
+    document.getElementById('doneN').textContent = done;
+    document.getElementById('totalN').textContent = tasks.length;
+    document.getElementById('smallNum').textContent = tasks.filter(t=>!t.done).length;
+  }
+
+  function toggle(id, row) {
+    const task = tasks.find(t=>t.id===id);
+    if (!task) return;
+    task.done = !task.done;
+    row.classList.toggle('done', task.done);
+    updateCount();
+    if (task.done) {
+      // 完成后短暂停留再移出，给用户「划掉」的确认感
+      setTimeout(()=>{
+        row.classList.add('removing');
+        setTimeout(()=>{ tasks = tasks.filter(t=>t.id!==id); render(); }, 320);
+      }, 520);
+    }
+  }
+
+  function focusAdd() {
+    addbar.classList.add('focus');
+    input.focus();
+  }
+  input.addEventListener('blur', ()=>{ if(!input.value) addbar.classList.remove('focus'); nl.classList.remove('show'); });
+
+  // 极简自然语言识别提示
+  input.addEventListener('input', ()=>{
+    const v = input.value;
+    const map = [
+      [/今晚|晚上/, '🌙 今晚'], [/明天|tomorrow/i,'🗓 明天'], [/后天/, '🗓 后天'],
+      [/今天|today/i,'🗓 今天'], [/周[一二三四五六日天]|周末/, '🗓 本周某天'],
+      [/(\d+)\s*点|(\d{1,2})(am|pm)/i,'⏰ 设置提醒'], [/截止|deadline|前交/i,'⚑ 死线']
+    ];
+    let hit = null;
+    for (const [re,label] of map){ if(re.test(v)){ hit=label; break; } }
+    if (hit){ nl.textContent = '识别到 '+hit+' · 回车保存'; nl.classList.add('show'); }
+    else nl.classList.remove('show');
+  });
+
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter') {
+      const v = input.value.trim();
+      if (!v) return;
+      tasks.unshift({ id: uid++, t: v });
+      input.value=''; nl.classList.remove('show');
+      render();
+      flash('已添加到今天 ✓');
+    }
+  });
+
+  function sparkle(e){
+    e.stopPropagation();
+    const v = input.value.trim();
+    if (v.length < 4){ flash('输入长句后用 ✨ 拆解'); focusAdd(); return; }
+    flash('✨ 拆解中…跳转 App 草稿评审');
+  }
+
+  let toastTimer;
+  function flash(msg){
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>el.classList.remove('show'), 1500);
+  }
+
+  function escapeHtml(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  render();
+</script>
+</body>
+</html>

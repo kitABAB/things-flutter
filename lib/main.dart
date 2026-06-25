@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/database/powersync_db.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/sync_service.dart';
+import 'data/services/today_widget_service.dart';
 import 'presentation/shared/theme/app_theme.dart';
 import 'presentation/shared/widgets/magic_plus.dart';
 import 'presentation/layouts/responsive_layout.dart';
@@ -17,6 +18,7 @@ void main() async {
   await openDatabase();
   await NotificationService.instance.init();
   await SyncService.instance.load();
+  await TodayWidgetService.instance.init();
 
   runApp(
     const ProviderScope(

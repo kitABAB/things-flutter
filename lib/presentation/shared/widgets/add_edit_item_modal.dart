@@ -2,10 +2,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../ai/ai_providers.dart';
+import '../../../ai/capture/capture_draft.dart';
+import '../../../ai/capture/capture_parser.dart';
+import '../../../ai/core/llm_exception.dart';
 import '../../../domain/models/item.dart';
 import '../../providers/item_providers.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_format.dart';
+import 'capture_review_sheet.dart';
 import 'when_picker_sheet.dart';
 import 'move_target_sheet.dart';
 
@@ -66,6 +71,9 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
 
   /// 待附加的标签（新建场景暂存，保存后一次性 attach）。
   final Set<String> _tagIds = {};
+
+  /// AI 正在拆解。
+  bool _aiBusy = false;
 
   bool get _isEdit => widget.existing != null;
   String? get _contextProjectId => widget.projectId;
@@ -220,12 +228,72 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// ✨ 一句话拆解：把标题交给 AI 整理成结构化草稿，再进评审框确认落库。
+  Future<void> _runAi() async {
+    final text = _titleController.text.trim();
+    if (text.length < 2 || _aiBusy) return;
+
+    setState(() => _aiBusy = true);
+    final parser = ref.read(captureParserProvider);
+    final ctx = CaptureContext(
+      now: DateTime.now(),
+      projectNames:
+          (ref.read(projectsProvider).value ?? []).map((e) => e.title).toList(),
+      areaNames:
+          (ref.read(areasProvider).value ?? []).map((e) => e.title).toList(),
+      tagNames:
+          (ref.read(tagsProvider).value ?? []).map((e) => e.title).toList(),
+    );
+
+    CaptureDraft draft;
+    try {
+      draft = await parser.parse(text, ctx);
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() => _aiBusy = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.isNotConfigured
+            ? '尚未配置 AI 的 API Key'
+            : '拆解失败：${e.message}'),
+      ));
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _aiBusy = false);
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('拆解失败：$e')));
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _aiBusy = false);
+
+    // 没拆出更多结构 -> 不打断，提示用户可直接保存为单条。
+    if (!draft.hasStructure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没拆出更多结构，可直接保存为单条')),
+      );
+      return;
+    }
+
+    // 关闭当前新建模态，打开草稿评审框。
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await CaptureReviewSheet.show(
+      navigator.context,
+      draft,
+      contextProjectId: widget.projectId,
+      headingId: widget.headingId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     final maxH = math.min(560.0, mq.size.height * 0.82);
     final tags = ref.watch(tagsProvider).value ?? [];
     final tagTitleById = {for (final t in tags) t.id: t.title};
+    final aiEnabled = ref.watch(aiEnabledProvider);
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -339,6 +407,7 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
                       icon: Icons.label_outline_rounded,
                       onTap: _pickTags,
                     ),
+                  if (!_isEdit && aiEnabled) _aiTool(),
                   const Spacer(),
                   FilledButton(
                     onPressed:
@@ -393,6 +462,28 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// ✨ 拆解按钮：标题够长时点亮，拆解中显示进度。
+  Widget _aiTool() {
+    final ready = _titleController.text.trim().length >= 2 && !_aiBusy;
+    final color = ready ? AppTheme.primaryBlue : AppTheme.textSecondary;
+    return InkWell(
+      onTap: ready ? _runAi : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 1),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: _aiBusy
+            ? const SizedBox(
+                width: 19,
+                height: 19,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: AppTheme.primaryBlue),
+              )
+            : Icon(Icons.auto_awesome_rounded, size: 19, color: color),
       ),
     );
   }

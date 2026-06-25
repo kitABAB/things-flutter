@@ -13,6 +13,7 @@ import 'project_screen.dart';
 import 'search_screen.dart';
 import 'trash_screen.dart';
 import 'sync_settings_screen.dart';
+import 'ai_settings_screen.dart';
 
 /// 移动端主页：Things 风格的清单导航（系统视图 + 领域/项目）。
 class HomeListScreen extends ConsumerWidget {
@@ -41,6 +42,13 @@ class HomeListScreen extends ConsumerWidget {
           IconButton(
             icon: Icon(Icons.search, color: AppTheme.textSecondary),
             onPressed: () => _openSearch(context),
+          ),
+          IconButton(
+            icon: Icon(Icons.auto_awesome_outlined,
+                color: AppTheme.textSecondary),
+            tooltip: 'AI 模型',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const AiSettingsScreen())),
           ),
           IconButton(
             icon: Icon(Icons.cloud_sync_outlined, color: AppTheme.textSecondary),

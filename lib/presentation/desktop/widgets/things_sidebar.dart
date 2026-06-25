@@ -7,6 +7,7 @@ import '../../shared/widgets/progress_pie.dart';
 import '../../shared/widgets/name_dialog.dart';
 import '../../screens/search_screen.dart';
 import '../../screens/trash_screen.dart';
+import '../../screens/ai_settings_screen.dart';
 
 /// 桌面端侧边栏选中项：要么是系统视图，要么是某个项目。
 class SidebarSelection {
@@ -88,6 +89,10 @@ class ThingsSidebar extends ConsumerWidget {
             _actionRow(context, Icons.delete_outline, '垃圾桶', () {
               Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const TrashScreen()));
+            }),
+            _actionRow(context, Icons.auto_awesome_outlined, 'AI 模型', () {
+              Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AiSettingsScreen()));
             }),
           ],
         ),

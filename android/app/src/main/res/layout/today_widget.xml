@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/today_widget_bg"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <!-- 头部：★ 今天  …  漏斗 + 进度环 / 已筛标签 -->
+    <LinearLayout
+        android:id="@+id/w_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="6dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="★"
+            android:textColor="#FAC51C"
+            android:textSize="16sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="7dp"
+            android:text="今天"
+            android:textColor="#1A1A1A"
+            android:textStyle="bold"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <!-- 漏斗：展开/收起标签筛选行 -->
+        <ImageView
+            android:id="@+id/w_funnel"
+            android:layout_width="30dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="2dp"
+            android:padding="4dp"
+            android:src="@drawable/ic_funnel"
+            android:contentDescription="按标签筛选" />
+
+        <!-- 进度环（未筛选时显示） -->
+        <LinearLayout
+            android:id="@+id/w_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <ProgressBar
+                android:id="@+id/w_ring"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:indeterminate="false"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/today_ring" />
+
+            <TextView
+                android:id="@+id/w_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="0/0"
+                android:textColor="#8E8E93"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 已筛选标签胶囊（筛选时显示，点 ✕ 清除） -->
+        <LinearLayout
+            android:id="@+id/w_activetag"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@drawable/today_activetag_bg"
+            android:paddingStart="10dp"
+            android:paddingEnd="9dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/w_activetag_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxWidth="110dp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:text="#标签"
+                android:textColor="#2D7DF6"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="✕"
+                android:textColor="#2D7DF6"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 标签筛选行（漏斗展开时显示） -->
+    <LinearLayout
+        android:id="@+id/w_tagrow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/w_chip_all"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/chip_bg_sel"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="全部"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/w_chip_0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/chip_bg"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:maxWidth="92dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#3A3A3C"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/w_chip_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/chip_bg"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:maxWidth="92dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#3A3A3C"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/w_chip_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/chip_bg"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:maxWidth="92dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#3A3A3C"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/w_chip_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/chip_bg"
+            android:paddingStart="11dp"
+            android:paddingEnd="11dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:maxWidth="92dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="#3A3A3C"
+            android:textSize="12sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- 空态 -->
+    <TextView
+        android:id="@+id/w_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:visibility="gone"
+        android:text="这里清零，去享受生活"
+        android:textColor="#8E8E93"
+        android:textSize="13sp" />
+
+    <!-- 任务行容器（最多 3 行 + 还有 N 项） -->
+    <LinearLayout
+        android:id="@+id/w_rows"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <include layout="@layout/today_widget_row_0" />
+        <include layout="@layout/today_widget_row_1" />
+        <include layout="@layout/today_widget_row_2" />
+
+        <TextView
+            android:id="@+id/w_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:paddingStart="2dp"
+            android:visibility="gone"
+            android:text="还有更多"
+            android:textColor="#2D7DF6"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- 快速添加（落入收件箱） -->
+    <LinearLayout
+        android:id="@+id/w_add"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/today_addbar_bg"
+        android:paddingStart="13dp"
+        android:paddingEnd="13dp"
+        android:paddingTop="9dp"
+        android:paddingBottom="9dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="+"
+            android:textColor="#8E8E93"
+            android:textSize="17sp" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="9dp"
+            android:text="快速添加到收件箱…"
+            android:textColor="#8E8E93"
+            android:textSize="13.5sp" />
+    </LinearLayout>
+</LinearLayout>

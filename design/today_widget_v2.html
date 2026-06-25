@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>今日小组件 · 高保真 v2（紧凑版）</title>
+<style>
+  :root{
+    --blue:#2D7DF6; --amber:#F5B301; --evening:#5B6CF0; --red:#E5484D;
+    --text:#15151A; --text2:#9A9AA2; --line:#EEEEF1; --fill:#F4F4F6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh; padding:40px 28px 60px;
+    background:radial-gradient(1200px 700px at 20% -5%,#2b3350 0%,#1a1f33 45%,#12152300 100%),#0d0f17;
+    color:#fff; display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  h1{font-size:20px;font-weight:800;letter-spacing:.2px}
+  .lead{color:#aeb4c7;font-size:13px;max-width:680px;text-align:center;line-height:1.6;margin-bottom:22px}
+  .lead b{color:#fff}
+
+  .stage{display:flex;flex-wrap:wrap;gap:40px;justify-content:center;align-items:flex-start}
+
+  /* —— 手机主屏底板，用来体现“占几格” —— */
+  .phone{
+    width:300px; border-radius:38px; padding:16px 14px 18px;
+    background:
+      radial-gradient(120% 80% at 30% 0%, #8fb0ff33, transparent 60%),
+      linear-gradient(160deg,#cdd9f0 0%,#e7dcc9 60%,#f0e6d6 100%);
+    box-shadow:0 30px 70px rgba(0,0,0,.5), inset 0 0 0 1.5px rgba(255,255,255,.5);
+    position:relative;
+  }
+  .statusbar{display:flex;justify-content:space-between;align-items:center;padding:2px 12px 12px;color:#2a2f3d;font-size:12px;font-weight:700}
+  .statusbar .dots{display:flex;gap:5px;align-items:center}
+  .statusbar svg{width:15px;height:15px;display:block}
+
+  /* 网格背景行（淡格点，暗示 4 列） */
+  .grid{display:flex;flex-direction:column;gap:14px}
+
+  /* —— App 图标行（体现尺度对比） —— */
+  .icons{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 0;justify-items:center}
+  .ic{width:54px;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .ic .sq{width:50px;height:50px;border-radius:15px;box-shadow:0 6px 14px rgba(30,40,70,.25);display:flex;align-items:center;justify-content:center}
+  .ic .nm{font-size:10.5px;color:#3a3f4d;font-weight:600}
+
+  /* —— 通用小组件外观 —— */
+  .widget{background:#fff;border-radius:24px;box-shadow:0 10px 26px rgba(35,45,75,.18), inset 0 0 0 1px rgba(0,0,0,.03);overflow:hidden}
+
+  /* 4×2：默认推荐尺寸（短，只占两行格子） */
+  .w42{padding:14px 15px 12px;display:flex;flex-direction:column;gap:0}
+  .whead{display:flex;align-items:center;gap:8px;padding-bottom:9px}
+  .whead .star{width:18px;height:18px;color:var(--amber);flex:none}
+  .whead h2{font-size:16px;font-weight:800;color:var(--text)}
+  .whead .ring{margin-left:auto;display:flex;align-items:center;gap:7px}
+  .whead .ring .cnt{font-size:12.5px;font-weight:700;color:var(--text2)}
+  .whead .ring .cnt b{color:var(--text)}
+  .ringsvg{width:22px;height:22px;transform:rotate(-90deg)}
+
+  .row{display:flex;align-items:center;gap:10px;padding:6px 2px;border-radius:9px}
+  .cbox{width:19px;height:19px;border-radius:6px;border:1.7px solid #CFCFD6;flex:none;display:flex;align-items:center;justify-content:center}
+  .cbox.on{background:var(--blue);border-color:var(--blue)}
+  .cbox svg{width:11px;height:11px}
+  .row .t{font-size:13.5px;font-weight:500;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row.done .t{color:var(--text2);text-decoration:line-through}
+  .row .flag{width:13px;height:13px;color:var(--red);flex:none}
+
+  .addpill{margin-top:8px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;background:var(--fill)}
+  .addpill .pl{width:15px;height:15px;color:var(--blue);flex:none}
+  .addpill span{font-size:12.5px;font-weight:600;color:var(--text2)}
+
+  /* 2×2：极简款（只占四格的正方形） */
+  .w22{width:150px;height:150px;padding:15px;display:flex;flex-direction:column;position:relative}
+  .w22 .star{width:17px;height:17px;color:var(--amber)}
+  .w22 .big{font-size:50px;font-weight:800;line-height:1;letter-spacing:-2px;margin-top:auto;color:var(--text)}
+  .w22 .cap{font-size:12px;color:var(--text2);font-weight:600;margin-top:2px}
+  .w22 .next{font-size:11.5px;color:var(--text);font-weight:500;margin-top:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+  .w22 .next .dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex:none}
+  .w22 .fab{position:absolute;right:13px;top:13px;width:30px;height:30px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;box-shadow:0 5px 12px rgba(45,125,246,.45)}
+  .w22 .fab svg{width:15px;height:15px;color:#fff}
+
+  .cap2{margin-top:14px;text-align:center}
+  .cap2 .k{font-size:13px;font-weight:800;color:#fff}
+  .cap2 .v{font-size:11.5px;color:#aeb4c7;margin-top:3px}
+
+  /* 右侧说明 */
+  .notes{max-width:340px;display:flex;flex-direction:column;gap:14px;padding-top:6px}
+  .cmp{display:flex;gap:10px;align-items:center;background:#ffffff0f;border:1px solid #ffffff1f;border-radius:14px;padding:12px 14px}
+  .cmp .b{width:42px;height:42px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;text-align:center;line-height:1.1}
+  .cmp .old{background:repeating-linear-gradient(45deg,#5a3a3a,#5a3a3a 6px,#6b4242 6px,#6b4242 12px)}
+  .cmp .new{background:linear-gradient(135deg,#2D7DF6,#5b6cf0)}
+  .cmp .txt{font-size:12.5px;color:#d7dbe8;line-height:1.5}
+  .cmp .txt b{color:#fff}
+  .note{display:flex;gap:11px;font-size:12.5px;color:#c9cddb;line-height:1.55}
+  .note .n{flex:none;width:21px;height:21px;border-radius:50%;background:#ffffff1a;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .note b{color:#fff}
+</style>
+</head>
+<body>
+  <h1>今日小组件 · v2 紧凑版</h1>
+  <p class="lead">把默认从 <b>4×4</b> 砍到 <b>4×2</b>（高度减半），再补一个 <b>2×2</b> 极简方块。视觉换成 SVG 线性图标 + 进度环，行高收紧、留白更克制。</p>
+
+  <div class="stage">
+    <!-- 主屏：4×2 推荐 -->
+    <div>
+      <div class="phone">
+        <div class="statusbar">
+          <span>9:41</span>
+          <div class="dots">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2a2f3d" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="#2a2f3d"><rect x="2" y="7" width="18" height="10" rx="2.5"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+          </div>
+        </div>
+        <div class="grid">
+          <!-- 4×2 widget -->
+          <div class="widget w42">
+            <div class="whead">
+              <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+              <h2>今天</h2>
+              <div class="ring">
+                <svg class="ringsvg" viewBox="0 0 36 36">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#ECECEF" stroke-width="4"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#2D7DF6" stroke-width="4" stroke-linecap="round" stroke-dasharray="94.2" stroke-dashoffset="56.5"/>
+                </svg>
+                <span class="cnt"><b>2</b>/5</span>
+              </div>
+            </div>
+            <div class="row done">
+              <div class="cbox on"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5"><path d="M5 13l4 4L19 7"/></svg></div>
+              <span class="t">回复设计稿反馈</span>
+            </div>
+            <div class="row">
+              <div class="cbox"></div>
+              <span class="t">完善项目计划书</span>
+              <svg class="flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M6 21V4h11l-2 3.5L17 11H6"/></svg>
+            </div>
+            <div class="row">
+              <div class="cbox"></div>
+              <span class="t">锻炼身体 30 分钟</span>
+            </div>
+            <div class="addpill">
+              <svg class="pl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              <span>快速添加到收件箱…</span>
+            </div>
+          </div>
+
+          <!-- 图标行：体现占用尺度 -->
+          <div class="icons">
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#34c759,#28a745)"></div><div class="nm">日历</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#ff9f0a,#ff6b00)"></div><div class="nm">备忘</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#0a84ff,#0060df)"></div><div class="nm">相机</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#5e5ce6,#3634a3)"></div><div class="nm">音乐</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap2"><div class="k">4×2 · 默认推荐</div><div class="v">头部进度环 + 3 条最紧要 + 一键添加</div></div>
+    </div>
+
+    <!-- 主屏：2×2 极简 -->
+    <div>
+      <div class="phone" style="width:300px">
+        <div class="statusbar">
+          <span>9:41</span>
+          <div class="dots">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2a2f3d" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="#2a2f3d"><rect x="2" y="7" width="18" height="10" rx="2.5"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+          </div>
+        </div>
+        <div class="grid">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <!-- 2×2 widget -->
+            <div class="widget w22">
+              <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L12 18.6 6.1 21.3l1.2-6.6L2.5 9.5l6.6-.9z"/></svg>
+              <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+              <div class="big">3</div>
+              <div class="cap">件事待办</div>
+              <div class="next"><span class="dot"></span>完善项目计划书</div>
+            </div>
+            <!-- 占位两个图标，体现 2x2 footprint -->
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px 8px;flex:1">
+              <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#34c759,#28a745)"></div><div class="nm">日历</div></div>
+              <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#ff9f0a,#ff6b00)"></div><div class="nm">备忘</div></div>
+              <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#0a84ff,#0060df)"></div><div class="nm">相机</div></div>
+              <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#ff375f,#d6004a)"></div><div class="nm">健康</div></div>
+            </div>
+          </div>
+          <div class="icons">
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#5e5ce6,#3634a3)"></div><div class="nm">音乐</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#64d2ff,#0a84ff)"></div><div class="nm">天气</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#8e8e93,#636366)"></div><div class="nm">设置</div></div>
+            <div class="ic"><div class="sq" style="background:linear-gradient(135deg,#30d158,#248a3d)"></div><div class="nm">电话</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap2"><div class="k">2×2 · 极简方块</div><div class="v">剩余计数 + 最紧要一条 + 角标 ＋</div></div>
+    </div>
+
+    <!-- 说明 -->
+    <div class="notes">
+      <div class="cmp">
+        <div class="b old">4×4<br>旧</div>
+        <div class="txt"><b>旧版</b>：6 行全列 + 加号栏，占满 4×4，又高又笨。</div>
+      </div>
+      <div class="cmp">
+        <div class="b new">4×2<br>新</div>
+        <div class="txt"><b>新版</b>：高度减半。超出 3 条折叠为「还有 N 项 →」，点头部进 App 看全部。</div>
+      </div>
+      <div class="note"><span class="n">1</span><div><b>更克制</b>：线性 SVG 图标替代 emoji（★⚑✓＋），行高 31px → 更精致，不再“糊一团”。</div></div>
+      <div class="note"><span class="n">2</span><div><b>进度环</b>：头部右上角小环一眼看完成度，替代占地的 “N 项” 文字。</div></div>
+      <div class="note"><span class="n">3</span><div><b>添加</b>：底部细药丸点一下→弹半透明输入浮层，落收件箱（已实现）。</div></div>
+      <div class="note"><span class="n">4</span><div><b>两种尺寸</b>：想极简就放 2×2；想看清单就放 4×2。都比现在小很多。</div></div>
+    </div>
+  </div>
+</body>
+</html>

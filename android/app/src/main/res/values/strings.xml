@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="today_widget_desc">今天 · 清单：今天要做的事，随手添加</string>
+    <string name="today_compact_widget_desc">今天 · 极简：剩余件数与最紧要一条</string>
+</resources>

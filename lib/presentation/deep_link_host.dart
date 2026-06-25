@@ -2,13 +2,15 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/services/today_widget_service.dart';
 import '../domain/models/item.dart';
 import 'providers/item_providers.dart';
+import 'shared/widgets/add_edit_item_modal.dart';
+import 'shared/widgets/when_picker_sheet.dart';
 
-/// 监听 URL Scheme 快速捕获：
-///   things:///add?title=买牛奶
-///   things://add?title=...
-/// 收到后创建一条 Inbox 任务，并提示。
+/// 监听 URL Scheme 快速捕获，并把「今天」实时同步到主屏小组件。
+///   things://add?title=买牛奶   —— 直接捕获到收件箱
+///   things://capture           —— 打开「新建任务」（默认今天），供小组件 ＋ 使用
 class DeepLinkHost extends ConsumerStatefulWidget {
   final Widget child;
   const DeepLinkHost({super.key, required this.child});
@@ -36,6 +38,15 @@ class _DeepLinkHostState extends ConsumerState<DeepLinkHost> {
   }
 
   Future<void> _handle(Uri uri) async {
+    // 小组件 ＋：打开「新建任务」，默认落到今天。
+    final isCapture =
+        uri.host == 'capture' || uri.pathSegments.contains('capture');
+    if (isCapture) {
+      if (!mounted) return;
+      await AddEditItemModal.show(context, defaultWhen: WhenChoice.today);
+      return;
+    }
+
     // 兼容 things://add 与 things:///add 两种写法。
     final isAdd = uri.host == 'add' ||
         uri.pathSegments.contains('add') ||
@@ -62,5 +73,14 @@ class _DeepLinkHostState extends ConsumerState<DeepLinkHost> {
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    // 「今天」列表一变就重算并推送给主屏小组件（首帧加载完即首推）。
+    // 重算逻辑（含标签/筛选/进度）统一在 service 内用全局 db 完成。
+    ref.listen<AsyncValue<List<Item>>>(todayProvider, (_, next) {
+      if (next.value != null) {
+        TodayWidgetService.instance.refresh();
+      }
+    });
+    return widget.child;
+  }
 }

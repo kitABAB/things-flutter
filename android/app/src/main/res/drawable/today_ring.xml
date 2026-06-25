@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 圆环进度（determinate）：背景灰环 + 前景蓝环按 level 扫过，从 12 点顺时针。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape
+            android:shape="ring"
+            android:thickness="3dp"
+            android:innerRadiusRatio="3.4"
+            android:useLevel="false">
+            <solid android:color="#ECECEF" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <rotate
+            android:fromDegrees="270"
+            android:toDegrees="270"
+            android:pivotX="50%"
+            android:pivotY="50%">
+            <shape
+                android:shape="ring"
+                android:thickness="3dp"
+                android:innerRadiusRatio="3.4"
+                android:useLevel="true">
+                <solid android:color="#2D7DF6" />
+            </shape>
+        </rotate>
+    </item>
+</layer-list>

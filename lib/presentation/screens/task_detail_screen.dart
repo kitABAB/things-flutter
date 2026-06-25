@@ -397,9 +397,7 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                     : null,
                 onTap: () => Navigator.of(ctx).pop(r),
               ),
-              ],
-            ),
-          ),
+          ],
         ),
       ),
     );

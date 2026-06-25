@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row2"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/row2_check"
+        android:layout_width="19dp"
+        android:layout_height="19dp"
+        android:background="@drawable/today_checkbox" />
+
+    <TextView
+        android:id="@+id/row2_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="10dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#1A1A1A"
+        android:textSize="13.5sp" />
+
+    <TextView
+        android:id="@+id/row2_flag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="6dp"
+        android:text="⚑"
+        android:textColor="#E5484D"
+        android:textSize="13sp"
+        android:visibility="gone" />
+</LinearLayout>

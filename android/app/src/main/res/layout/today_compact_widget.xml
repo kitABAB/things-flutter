@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 今日小组件 · 2×2 极简方块：剩余件数 + 最紧要一条 + 右上角 ＋。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/c_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/today_widget_bg"
+    android:padding="14dp">
+
+    <!-- 顶部：★（左） + 圆形 ＋（右） -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:text="★"
+            android:textColor="#FAC51C"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/c_fab"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="end|top"
+            android:background="@drawable/today_fab_bg"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+    </FrameLayout>
+
+    <!-- 弹性留白，把数字推到下方 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 大号剩余件数 -->
+    <TextView
+        android:id="@+id/c_big"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0"
+        android:textColor="#15151A"
+        android:textSize="46sp"
+        android:textStyle="bold"
+        android:includeFontPadding="false" />
+
+    <TextView
+        android:id="@+id/c_cap"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="件事待办"
+        android:textColor="#8E8E93"
+        android:textSize="12sp"
+        android:textStyle="bold" />
+
+    <!-- 最紧要一条 -->
+    <LinearLayout
+        android:id="@+id/c_next"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="9dp">
+
+        <TextView
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:background="@drawable/today_fab_bg" />
+
+        <TextView
+            android:id="@+id/c_next_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="7dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:text=""
+            android:textColor="#1A1A1A"
+            android:textSize="11.5sp" />
+    </LinearLayout>
+</LinearLayout>
