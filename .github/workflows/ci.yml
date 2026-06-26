@@ -1,0 +1,22 @@
+name: CI
+
+# 分支 push / PR 时做静态检查与测试，保证合并前代码健康。
+# 不构建、不发布产物——发布只由 release.yml 在打 v* 标签时触发。
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
