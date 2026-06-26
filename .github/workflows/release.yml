@@ -1,6 +1,6 @@
-name: Release APK
+name: Release
 
-# 打一个形如 v0.2 / v1.0 的 tag 即触发：自动编译 release APK 并发布到 Releases。
+# 打一个形如 v0.2 / v1.0 的 tag 即触发：云端编译各平台产物并发布到 Releases。
 on:
   push:
     tags:
@@ -10,35 +10,48 @@ permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  android:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Build release APK
-        run: flutter build apk --release
-
+      - run: flutter pub get
+      - run: flutter build apk --release
       - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk things-flutter-${{ github.ref_name }}.apk
-
-      - name: Publish GitHub Release
+        run: cp build/app/outputs/flutter-apk/app-release.apk things-flutter-${{ github.ref_name }}-android.apk
+      - name: Publish to Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
-          files: things-flutter-${{ github.ref_name }}.apk
+          files: things-flutter-${{ github.ref_name }}-android.apk
           generate_release_notes: true
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Package Windows (zip)
+        shell: pwsh
+        run: |
+          $rel = Get-ChildItem -Path build/windows -Recurse -Directory -Filter Release |
+            Where-Object { Test-Path (Join-Path $_.FullName 'data') } | Select-Object -First 1
+          if (-not $rel) { throw 'Release output folder not found' }
+          Compress-Archive -Path "$($rel.FullName)/*" -DestinationPath "things-flutter-${{ github.ref_name }}-windows-x64.zip" -Force
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: things-flutter-${{ github.ref_name }}-windows-x64.zip
