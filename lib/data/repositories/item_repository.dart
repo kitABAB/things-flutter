@@ -126,6 +126,14 @@ class ItemRepository {
     await _reschedule(id);
   }
 
+  /// 仅切换「今晚」标记（不动 start / start_date）。
+  /// 供「今天」视图里把任务在「白天 ⇄ 今晚」两段之间拖拽时使用。
+  Future<void> setEvening(String id, bool evening) async {
+    await db.execute('''
+      UPDATE items SET evening = ?, updated_at = ? WHERE id = ?
+    ''', [evening ? 1 : 0, DateTime.now().toIso8601String(), id]);
+  }
+
   Future<void> setDeadline(String id, DateTime? deadline) async {
     await db.execute('''
       UPDATE items SET deadline = ?, updated_at = ? WHERE id = ?

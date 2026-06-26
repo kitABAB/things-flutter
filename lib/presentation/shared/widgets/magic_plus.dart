@@ -213,13 +213,23 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
                       onAccept: () => _openCreate(overrideWhen: WhenChoice.inbox),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _dropZone(
                       icon: Icons.star_rounded,
                       label: '今天',
                       color: AppTheme.todayYellow,
                       onAccept: () => _openCreate(overrideWhen: WhenChoice.today),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _dropZone(
+                      icon: Icons.nightlight_round,
+                      label: '今晚',
+                      color: AppTheme.eveningIndigo,
+                      onAccept: () =>
+                          _openCreate(overrideWhen: WhenChoice.thisEvening),
                     ),
                   ),
                 ],

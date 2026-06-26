@@ -54,8 +54,18 @@ class ItemRow extends ConsumerWidget {
       key: ValueKey(item.id),
       startActionPane: ActionPane(
         motion: const ScrollMotion(),
-        extentRatio: 0.25,
+        extentRatio: 0.5,
         children: [
+          SlidableAction(
+            onPressed: (_) =>
+                repo.toggleComplete(item.id, !item.isCompleted),
+            backgroundColor: const Color(0xFF30A46C),
+            foregroundColor: Colors.white,
+            icon: item.isCompleted
+                ? Icons.remove_done_rounded
+                : Icons.check_rounded,
+            label: item.isCompleted ? '取消' : '完成',
+          ),
           SlidableAction(
             onPressed: (_) => WhenPickerSheet.apply(context, ref, item.id),
             backgroundColor: AppTheme.todayYellow,

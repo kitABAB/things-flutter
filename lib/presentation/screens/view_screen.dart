@@ -605,7 +605,8 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     final day = items.where((i) => !i.evening).toList();
     final evening = items.where((i) => i.evening).toList();
     final events = ref.watch(todayCalendarProvider).value ?? const [];
-    return [
+
+    final head = <Widget>[
       if (events.isNotEmpty)
         SliverList(
           delegate: SliverChildBuilderDelegate(
@@ -615,14 +616,99 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
         ),
       if (events.isNotEmpty)
         const SliverToBoxAdapter(child: Divider(indent: 16, endIndent: 16)),
-      if (day.isNotEmpty)
-        if (_selecting) _flatList(context, day) else _reorderableList(context, day, todayOrder: true),
-      SliverToBoxAdapter(child: _eveningDivider(context)),
-      if (evening.isNotEmpty)
-        if (_selecting) _flatList(context, evening) else _reorderableList(context, evening, todayOrder: true)
-      else
-        SliverToBoxAdapter(child: _eveningHint(context)),
     ];
+
+    // 多选态：保持原来的两段平铺列表，不参与拖拽。
+    if (_selecting) {
+      return [
+        ...head,
+        if (day.isNotEmpty) _flatList(context, day),
+        SliverToBoxAdapter(child: _eveningDivider(context)),
+        if (evening.isNotEmpty)
+          _flatList(context, evening)
+        else
+          SliverToBoxAdapter(child: _eveningHint(context)),
+      ];
+    }
+
+    // 普通态：白天 + 「今晚」分隔线 + 今晚 合并成「同一个」可重排列表，
+    // 把任务拖过分隔线即在「白天 ⇄ 今晚」之间切换。
+    return [
+      ...head,
+      _todayReorderable(context, day, evening),
+      if (evening.isEmpty) SliverToBoxAdapter(child: _eveningHint(context)),
+    ];
+  }
+
+  /// 今天专用的合并可重排列表：[白天...] + [今晚分隔线] + [今晚...]。
+  /// 分隔线占一个槽位但不可拖动，仅作为「白天 / 今晚」的分界参照。
+  Widget _todayReorderable(
+      BuildContext context, List<Item> day, List<Item> evening) {
+    final dividerIndex = day.length;
+    final total = day.length + 1 + evening.length;
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      sliver: SliverReorderableList(
+        itemCount: total,
+        onReorderItem: (oldIndex, newIndex) =>
+            _reorderToday(day, evening, oldIndex, newIndex),
+        itemBuilder: (context, index) {
+          if (index == dividerIndex) {
+            // 分隔线：必须有 key，但不包拖拽监听 -> 自身不可被拖起。
+            return KeyedSubtree(
+              key: const ValueKey('today-evening-divider'),
+              child: _eveningDivider(context),
+            );
+          }
+          final isEve = index > dividerIndex;
+          final it = isEve ? evening[index - dividerIndex - 1] : day[index];
+          if (_expandedId == it.id && !it.isProject) {
+            return _taskRowKeyed(context, it);
+          }
+          return ReorderableDelayedDragStartListener(
+            key: ValueKey(it.id),
+            index: index,
+            child: ItemRow(
+              item: it,
+              onTapTask: _toggleExpand,
+              onTapProject: (i) => _openProject(context, i),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 处理今天合并列表的拖拽落点：按相对分隔线的位置切换 evening，
+  /// 并分别持久化「白天 / 今晚」两段的 today_sort_order。
+  void _reorderToday(
+      List<Item> day, List<Item> evening, int oldIndex, int newIndex) {
+    final repo = ref.read(itemRepositoryProvider);
+    const divider = '\u0000evening-divider';
+    final slots = <String>[
+      ...day.map((e) => e.id),
+      divider,
+      ...evening.map((e) => e.id),
+    ];
+    if (oldIndex < 0 || oldIndex >= slots.length) return;
+    final moved = slots.removeAt(oldIndex);
+    if (moved == divider) return; // 分隔线不可拖，理论上不会发生
+    slots.insert(newIndex.clamp(0, slots.length), moved);
+
+    final dividerPos = slots.indexOf(divider);
+    final dayIds = slots.sublist(0, dividerPos);
+    final eveIds = slots.sublist(dividerPos + 1);
+
+    final wasEvening = {for (final e in evening) e.id};
+    final wasDay = {for (final d in day) d.id};
+    for (final id in dayIds) {
+      if (wasEvening.contains(id)) repo.setEvening(id, false);
+    }
+    for (final id in eveIds) {
+      if (wasDay.contains(id)) repo.setEvening(id, true);
+    }
+    if (dayIds.isNotEmpty) repo.reorder(dayIds, todayOrder: true);
+    if (eveIds.isNotEmpty) repo.reorder(eveIds, todayOrder: true);
   }
 
   Widget _eveningHint(BuildContext context) {
