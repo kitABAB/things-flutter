@@ -43,3 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 开发时的手机截图（仅放本地，不入库；App 图标与 design/ 设计稿不受影响）
+/screen*.png
+/s_*.png
+/mp_*.png
