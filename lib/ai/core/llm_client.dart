@@ -20,4 +20,10 @@ abstract class LlmClient {
 
   /// 当前是否具备调用条件（主要看 API Key 是否就绪），供 UI 决定是否点亮入口。
   bool get isConfigured;
+
+  /// 拉取该端点/Key 可用的模型 id 列表（OpenAI 兼容 `GET /models`）。
+  /// 厂商不支持或失败时抛 [LlmException]，由 UI 兜底为「手动输入模型」。
+  Future<List<String>> listModels({
+    Duration timeout = const Duration(seconds: 15),
+  });
 }

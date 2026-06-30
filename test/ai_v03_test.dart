@@ -31,6 +31,12 @@ class FakeLlmClient implements LlmClient {
     lastMessages = messages;
     return reply;
   }
+
+  @override
+  Future<List<String>> listModels({
+    Duration timeout = const Duration(seconds: 15),
+  }) async =>
+      const [];
 }
 
 Item _task({

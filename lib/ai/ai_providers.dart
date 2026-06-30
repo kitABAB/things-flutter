@@ -4,42 +4,90 @@ import 'capture/capture_parser.dart';
 import 'clarify/clarify_service.dart';
 import 'config/ai_config.dart';
 import 'config/ai_settings_store.dart';
+import 'config/model_connection.dart';
 import 'core/llm_client.dart';
 import 'providers/openai_compat_client.dart';
 import 'review/review_service.dart';
 
-/// 当前 AI 配置。
+/// 全部 AI 设置：一组可切换的「模型连接」+ 当前选中的连接/模型。
 ///
-/// 解析优先级：本地持久化（设置页保存的）> 编译期环境变量（--dart-define）。
-/// 因此用户在设置页填一次 Key 后，每次启动自动生效，无需再贴。
-class AiConfigNotifier extends Notifier<AiConfig> {
+/// 解析优先级：本地持久化（设置页保存的连接）> 编译期环境变量（--dart-define，
+/// 作为没有任何连接时的兜底）。用户填一次 Key 后每次启动自动生效。
+class AiSettingsNotifier extends Notifier<AiSettings> {
   @override
-  AiConfig build() {
-    // 先同步返回环境变量配置，再异步用持久化值覆盖（加载完 UI 自动刷新）。
+  AiSettings build() {
+    // 先返回空设置（其 activeConfig 会回退到环境变量），再异步加载持久化值。
     _restore();
-    return AiConfig.fromEnvironment();
+    return const AiSettings();
   }
 
   Future<void> _restore() async {
-    final stored = await AiSettingsStore.load();
-    if (stored != null) state = stored;
+    state = await AiSettingsStore.load();
   }
 
-  /// 保存配置（持久化 + 立即生效）。
-  Future<void> save(AiConfig config) async {
-    await AiSettingsStore.save(config);
-    state = config;
+  Future<void> _persist() => AiSettingsStore.save(state);
+
+  /// 新增或更新一条连接。首次新增（或显式要求）时设为当前。
+  Future<void> upsertConnection(ModelConnection conn,
+      {bool makeActive = false}) async {
+    final list = [...state.connections];
+    final i = list.indexWhere((e) => e.id == conn.id);
+    if (i >= 0) {
+      list[i] = conn;
+    } else {
+      list.add(conn);
+    }
+    var next = state.copyWith(connections: list);
+    final activatingThis = conn.id == state.activeConnectionId;
+    if (makeActive || state.activeConnectionId == null) {
+      next = next.copyWith(
+          activeConnectionId: conn.id, activeModel: conn.primaryModel);
+    } else if (activatingThis &&
+        !conn.models.contains(state.activeModel)) {
+      // 当前连接被编辑后，原模型已不存在则回退到首选模型。
+      next = next.copyWith(activeModel: conn.primaryModel);
+    }
+    state = next;
+    await _persist();
   }
 
-  /// 清除已保存配置，回退到环境变量。
-  Future<void> clear() async {
+  Future<void> removeConnection(String id) async {
+    final list = state.connections.where((e) => e.id != id).toList();
+    if (state.activeConnectionId == id) {
+      state = list.isEmpty
+          ? const AiSettings()
+          : AiSettings(
+              connections: list,
+              activeConnectionId: list.first.id,
+              activeModel: list.first.primaryModel,
+            );
+    } else {
+      state = state.copyWith(connections: list);
+    }
+    await _persist();
+  }
+
+  /// 切换当前使用的连接与模型。
+  Future<void> setActive(String connectionId, String model) async {
+    state = state.copyWith(
+        activeConnectionId: connectionId, activeModel: model);
+    await _persist();
+  }
+
+  /// 清空所有连接，回退到环境变量。
+  Future<void> clearAll() async {
+    state = const AiSettings();
     await AiSettingsStore.clear();
-    state = AiConfig.fromEnvironment();
   }
 }
 
+final aiSettingsProvider =
+    NotifierProvider<AiSettingsNotifier, AiSettings>(AiSettingsNotifier.new);
+
+/// 当前生效的运行期配置（由当前连接 + 当前模型派生）。
+/// 业务层与 [llmClientProvider] 仍只依赖这一份扁平配置，多连接对它们透明。
 final aiConfigProvider =
-    NotifierProvider<AiConfigNotifier, AiConfig>(AiConfigNotifier.new);
+    Provider<AiConfig>((ref) => ref.watch(aiSettingsProvider).activeConfig);
 
 /// 厂商无关的对话客户端。所有厂商都走 OpenAI 兼容协议，故统一用一个实现。
 final llmClientProvider = Provider<LlmClient>((ref) {

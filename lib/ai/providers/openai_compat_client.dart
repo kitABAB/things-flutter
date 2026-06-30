@@ -87,6 +87,58 @@ class OpenAiCompatClient implements LlmClient {
     return content;
   }
 
+  @override
+  Future<List<String>> listModels({
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    if (!config.isReady) {
+      throw const LlmException.notConfigured();
+    }
+    final uri = Uri.parse('${_trimSlash(config.baseUrl)}/models');
+    http.Response resp;
+    try {
+      resp = await _http.get(
+        uri,
+        headers: {'Authorization': 'Bearer ${config.apiKey}'},
+      ).timeout(timeout);
+    } on TimeoutException {
+      throw LlmException(
+        '拉取模型列表超时（${timeout.inSeconds}s），请稍后重试',
+        retryable: true,
+      );
+    } on Exception catch (e) {
+      throw LlmException(
+        '网络连接失败，请检查网络后重试（${_briefCause(e)}）',
+        retryable: true,
+      );
+    }
+
+    if (resp.statusCode >= 400) {
+      throw LlmException(
+        _friendlyHttpError(resp.statusCode, _extractError(resp.bodyBytes)),
+        statusCode: resp.statusCode,
+        retryable: resp.statusCode >= 500 || resp.statusCode == 429,
+      );
+    }
+
+    final decoded = _decodeBody(resp.bodyBytes);
+    final data = decoded['data'];
+    if (data is! List) {
+      throw const LlmException('未能解析模型列表');
+    }
+    final ids = <String>[];
+    for (final m in data) {
+      if (m is Map && m['id'] is String) {
+        var id = m['id'] as String;
+        // 部分厂商（如 Gemini）返回 `models/xxx`，补全接口用的是去前缀的名字。
+        if (id.startsWith('models/')) id = id.substring('models/'.length);
+        if (id.isNotEmpty && !ids.contains(id)) ids.add(id);
+      }
+    }
+    ids.sort();
+    return ids;
+  }
+
   /// 强制按 UTF-8 解码，避免中文返回乱码。
   Map<String, dynamic> _decodeBody(List<int> bytes) {
     try {
