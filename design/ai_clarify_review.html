@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 理清 & 一键回顾 · 高保真</title>
+<style>
+  :root{
+    --blue:#2D7DF6; --amber:#F5B301; --violet:#5B6CF0; --evening:#5B6CF0;
+    --red:#E5484D; --teal:#21B5A8; --green:#34C759; --beige:#B7935A;
+    --text:#15151A; --text2:#9A9AA2; --text3:#BDBDC4;
+    --line:#EEEEF1; --fill:#F4F4F6; --ai:#6B5BF0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh; padding:40px 28px 70px;
+    background:radial-gradient(1200px 700px at 20% -5%,#2b3350 0%,#1a1f33 45%,#12152300 100%),#0d0f17;
+    color:#fff; display:flex; flex-direction:column; align-items:center; gap:6px;
+  }
+  h1{font-size:21px;font-weight:800;letter-spacing:.2px}
+  .lead{color:#aeb4c7;font-size:13px;max-width:720px;text-align:center;line-height:1.65;margin-bottom:24px}
+  .lead b{color:#fff}
+  .stage{display:flex;flex-direction:column;gap:40px;justify-content:center;align-items:center}
+
+  /* 手机外壳 */
+  .phone{
+    width:316px; border-radius:42px; padding:14px 13px;
+    background:linear-gradient(160deg,#cdd9f0 0%,#e7dcc9 60%,#f0e6d6 100%);
+    box-shadow:0 30px 70px rgba(0,0,0,.5), inset 0 0 0 1.5px rgba(255,255,255,.5);
+    position:relative;
+  }
+  .screen-cap{margin-top:14px;text-align:center}
+  .screen-cap .k{font-size:13.5px;font-weight:800;color:#fff}
+  .screen-cap .v{font-size:11.5px;color:#aeb4c7;margin-top:3px;max-width:300px}
+
+  /* App 屏幕 */
+  .app{background:#fff;border-radius:30px;overflow:hidden;height:660px;position:relative;display:flex;flex-direction:column}
+  .sb{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 6px;color:#2a2f3d;font-size:12px;font-weight:700;flex:none}
+  .sb .dots{display:flex;gap:5px;align-items:center}
+  .sb svg{width:15px;height:15px}
+
+  /* 顶栏 */
+  .nav{display:flex;align-items:center;gap:10px;padding:6px 18px 10px;flex:none}
+  .nav .back{color:var(--text2);font-size:20px;line-height:1}
+  .nav h2{font-size:21px;font-weight:800;color:var(--text)}
+  .nav .sub{font-size:12px;color:var(--text2);font-weight:600}
+  .nav .spacer{flex:1}
+
+  /* 通用 */
+  .ai-badge{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#6B5BF0,#9C6BF0);display:flex;align-items:center;justify-content:center;flex:none}
+  .ai-badge svg{width:15px;height:15px;color:#fff}
+  .seed{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text);background:var(--fill);padding:8px 13px;border-radius:11px}
+  .seed .dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+
+  /* AI 气泡 */
+  .bubble{background:#F1F0FE;border-radius:14px;border-top-left-radius:5px;padding:11px 13px;font-size:13px;line-height:1.55;color:#2c2c33}
+  .bubble b{color:var(--ai)}
+
+  /* 选项 chips */
+  .opts{display:flex;flex-wrap:wrap;gap:8px}
+  .opt{font-size:13px;font-weight:600;color:#46464c;background:#fff;border:1.4px solid #E3E3EA;padding:8px 14px;border-radius:20px;cursor:pointer;transition:.14s}
+  .opt:hover{border-color:#c7c7d0}
+  .opt.sel{background:rgba(107,91,240,.12);border-color:var(--ai);color:var(--ai)}
+  .qlabel{font-size:12.5px;font-weight:700;color:var(--text2);margin-bottom:8px}
+
+  /* 理清卡片 */
+  .ccard{border:1.5px solid #E7E7EE;border-radius:16px;overflow:hidden}
+  .ccard .ch{display:flex;align-items:center;gap:7px;padding:9px 14px;background:linear-gradient(135deg,rgba(107,91,240,.08),rgba(156,107,240,.06));font-size:11px;font-weight:800;color:var(--ai);letter-spacing:.3px}
+  .ccard .ch svg{width:13px;height:13px}
+  .crow{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid #F0F0F4}
+  .crow:first-of-type{border-top:none}
+  .crow .lab{font-size:11.5px;color:var(--text2);font-weight:600;width:52px;flex:none}
+  .crow .val{font-size:14px;color:var(--text);font-weight:600;flex:1}
+  .crow .pill{font-size:12px;font-weight:700;padding:3px 10px;border-radius:8px}
+  .pill.proj{color:var(--blue);background:rgba(45,125,246,.12)}
+  .pill.tag{color:var(--teal);background:rgba(33,181,168,.12)}
+  .pill.today{color:var(--amber);background:rgba(245,179,1,.16)}
+  .pill.area{color:var(--text);background:var(--fill)}
+  .crow .next-ico{width:16px;height:16px;color:var(--green);flex:none}
+
+  /* 底部操作条 */
+  .acts{display:flex;gap:9px;padding:12px 16px;border-top:1px solid var(--line);flex:none;background:#fff}
+  .btn{flex:1;text-align:center;font-size:14px;font-weight:700;padding:12px;border-radius:13px;cursor:pointer;border:none;transition:.14s}
+  .btn.primary{background:var(--blue);color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.ghost{background:var(--fill);color:#46464c;flex:0 0 auto;padding:12px 16px}
+  .btn.ghost:hover{background:#ececef}
+
+  /* sheet（单条理清，覆盖列表） */
+  .listbg{position:absolute;inset:0;padding:54px 22px 0;filter:saturate(.96)}
+  .listbg h2{font-size:24px;font-weight:800;margin-bottom:16px;color:#1c1c1e}
+  .lrow{display:flex;align-items:center;gap:13px;padding:11px 2px;border-bottom:1px solid #eee}
+  .lcbox{width:19px;height:19px;border:1.6px solid #CFCFD6;border-radius:6px;flex:none}
+  .lrow span{font-size:15px;color:#2c2c2e}
+  .scrim{position:absolute;inset:0;background:rgba(20,20,30,.34);display:flex;align-items:flex-end}
+  .sheet{width:100%;background:#fff;border-radius:24px 24px 30px 30px;padding:8px 16px 16px;display:flex;flex-direction:column;gap:13px;animation:up .3s cubic-bezier(.2,.9,.3,1.1)}
+  @keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+  .grab{width:38px;height:5px;border-radius:3px;background:#E0E0E6;margin:2px auto 4px}
+  .sheet-head{display:flex;align-items:center;gap:9px}
+  .sheet-head .t{font-size:13px;font-weight:800;color:var(--text)}
+
+  /* 批量进度 */
+  .prog{display:flex;align-items:center;gap:8px;padding:0 18px 8px;flex:none}
+  .prog .bar{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+  .prog .bar i{display:block;height:100%;width:34%;background:linear-gradient(90deg,#6B5BF0,#9C6BF0);border-radius:3px}
+  .prog .n{font-size:12px;font-weight:700;color:var(--text2)}
+  .scroll{flex:1;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:13px}
+  .auto{display:flex;align-items:center;gap:9px;padding:11px 16px;flex:none;border-top:1px solid var(--line)}
+  .auto .tg{width:38px;height:22px;border-radius:12px;background:var(--blue);position:relative;flex:none}
+  .auto .tg::after{content:"";position:absolute;right:2px;top:2px;width:18px;height:18px;border-radius:50%;background:#fff}
+  .auto span{font-size:12.5px;color:#46464c;font-weight:600}
+
+  /* 回顾报告 */
+  .review{flex:1;overflow:hidden;padding:2px 16px 0;display:flex;flex-direction:column;gap:13px}
+  .sec{border:1.5px solid #EBEBF0;border-radius:16px;overflow:hidden}
+  .sec .sh{display:flex;align-items:center;gap:9px;padding:11px 14px}
+  .sec .sh .ix{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex:none}
+  .sec .sh .ti{font-size:14px;font-weight:700;color:var(--text);flex:1}
+  .sec .sh .cnt{font-size:12px;font-weight:700;color:var(--text2)}
+  .sec .sb2{padding:0 14px 13px;display:flex;flex-direction:column;gap:10px}
+  .item{font-size:13.5px;color:var(--text);font-weight:600}
+  .meta{font-size:11.5px;color:var(--text2);font-weight:600;margin-top:2px}
+  .aitip{display:flex;gap:7px;font-size:12px;line-height:1.5;color:#5a5a63;background:#F6F5FE;border-radius:10px;padding:8px 10px}
+  .aitip svg{width:13px;height:13px;color:var(--ai);flex:none;margin-top:2px}
+  .miniacts{display:flex;gap:7px;flex-wrap:wrap;margin-top:3px}
+  .mbtn{font-size:12px;font-weight:700;padding:6px 11px;border-radius:9px;cursor:pointer;border:none;background:var(--fill);color:#46464c}
+  .mbtn.go{background:rgba(45,125,246,.12);color:var(--blue)}
+  .mbtn.warn{background:rgba(229,72,77,.10);color:var(--red)}
+  .focusbox{background:linear-gradient(135deg,rgba(107,91,240,.10),rgba(45,125,246,.08));border-radius:14px;padding:12px 14px;display:flex;gap:9px}
+  .focusbox svg{width:16px;height:16px;color:var(--ai);flex:none;margin-top:1px}
+  .focusbox .ft{font-size:13px;line-height:1.55;color:#34343c;font-weight:500}
+  .focusbox .ft b{color:var(--text);font-weight:800}
+  .donebar{padding:12px 16px;flex:none;border-top:1px solid var(--line)}
+  .donebar .b{display:block;width:100%;text-align:center;background:var(--green);color:#fff;font-size:14.5px;font-weight:800;padding:13px;border-radius:14px;cursor:pointer}
+
+  /* 说明 */
+  .notes{max-width:760px;display:flex;flex-direction:column;gap:13px;padding-top:30px}
+  .notes .grp{font-size:12px;font-weight:800;color:#fff;letter-spacing:.4px;margin-top:6px}
+  .note{display:flex;gap:11px;font-size:12.5px;color:#c9cddb;line-height:1.55}
+  .note .n{flex:none;width:21px;height:21px;border-radius:50%;background:#ffffff1a;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+  .note b{color:#fff}
+  .sparkle{width:13px;height:13px}
+</style>
+</head>
+<body>
+  <h1>AI 理清 & 一键回顾 · 高保真</h1>
+  <p class="lead">让产品接住<b>任何成熟度</b>的事：模糊的念头由 <b>AI 教练</b>对话式理清，积压的收件箱<b>批量过一遍</b>，再用<b>一键回顾</b>把搁置/卡住/无下一步的事重新推动起来。AI 只<b>草拟</b>，你<b>拍板</b>。</p>
+
+  <div class="stage">
+
+    <!-- ============ 屏 1：单条 AI 理清（对话式 sheet） ============ -->
+    <div>
+      <div class="phone">
+        <div class="app">
+          <div class="sb"><span>9:41</span><div class="dots">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2a2f3d" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="#2a2f3d"><rect x="2" y="7" width="18" height="10" rx="2.5"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+          </div></div>
+          <!-- 收件箱底图 -->
+          <div class="listbg">
+            <h2>收件箱</h2>
+            <div class="lrow"><div class="lcbox"></div><span>买杯子</span></div>
+            <div class="lrow"><div class="lcbox"></div><span style="color:#1c1c1e;font-weight:600">拍笔记</span></div>
+            <div class="lrow"><div class="lcbox"></div><span>学日语</span></div>
+            <div class="lrow"><div class="lcbox"></div><span>模子群报班</span></div>
+          </div>
+          <!-- 理清 sheet -->
+          <div class="scrim">
+            <div class="sheet">
+              <div class="grab"></div>
+              <div class="sheet-head"><div class="ai-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg></div><div class="t">AI 理清</div></div>
+              <div class="seed"><span class="dot"></span>拍笔记</div>
+              <div class="bubble">这条有点模糊，我问你两个问题就能理清 👇</div>
+              <div>
+                <div class="qlabel">① 拍什么内容的笔记？</div>
+                <div class="opts">
+                  <div class="opt sel">读书</div><div class="opt">灵感</div><div class="opt">会议</div><div class="opt">其他…</div>
+                </div>
+              </div>
+              <div>
+                <div class="qlabel">② 拍完给谁看？</div>
+                <div class="opts">
+                  <div class="opt sel">自己存档</div><div class="opt">发布分享</div>
+                </div>
+              </div>
+              <div class="ccard">
+                <div class="ch"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>AI 理清建议</div>
+                <div class="crow"><span class="lab">类型</span><span class="val">项目</span><span class="pill proj">读书计划</span></div>
+                <div class="crow"><span class="lab">标题</span><span class="val">建立读书笔记习惯</span></div>
+                <div class="crow"><span class="lab">领域</span><span class="pill area">学习</span></div>
+                <div class="crow">
+                  <svg class="next-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                  <span class="val" style="font-weight:600">下一步：今晚拍 1 页并存档</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="screen-cap"><div class="k">① 单条理清 · 对话式</div><div class="v">模糊就反问，问完直接给「类型 / 标题 / 领域 / 下一步」草稿</div></div>
+    </div>
+
+    <!-- ============ 屏 2：批量理清（队列） ============ -->
+    <div>
+      <div class="phone">
+        <div class="app">
+          <div class="sb"><span>9:41</span><div class="dots">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2a2f3d" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="#2a2f3d"><rect x="2" y="7" width="18" height="10" rx="2.5"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+          </div></div>
+          <div class="nav"><span class="back">✕</span><h2 style="font-size:18px">理清收件箱</h2></div>
+          <div class="prog"><div class="bar"><i></i></div><span class="n">8 / 24</span></div>
+          <div class="scroll">
+            <div class="seed"><span class="dot"></span>学日语</div>
+            <div class="bubble">这是一个<b>「方向」</b>，太大了无法直接行动。建议建成<b>项目</b>，并立刻给它一个能动手的下一步——否则它会一直躺着。</div>
+            <div class="ccard">
+              <div class="ch"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>AI 理清建议</div>
+              <div class="crow"><span class="lab">类型</span><span class="val">项目</span><span class="pill area">学习</span></div>
+              <div class="crow"><span class="lab">标题</span><span class="val">确定日语目标并选 1 门课</span></div>
+              <div class="crow"><span class="lab">标签</span><span class="pill tag">@电脑</span></div>
+              <div class="crow">
+                <svg class="next-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                <span class="val" style="font-weight:600">下一步：对比 3 个入门 App</span>
+              </div>
+            </div>
+          </div>
+          <div class="acts">
+            <button class="btn primary">采纳并下一条</button>
+            <button class="btn ghost">改</button>
+            <button class="btn ghost">跳过</button>
+          </div>
+          <div class="auto"><div class="tg"></div><span>高置信度自动采纳，只让我确认需要追问的</span></div>
+        </div>
+      </div>
+      <div class="screen-cap"><div class="k">② 批量理清 · 队列</div><div class="v">24 条一次过完；明确的自动建议，模糊的才打断你追问</div></div>
+    </div>
+
+    <!-- ============ 屏 3：一键回顾报告 ============ -->
+    <div>
+      <div class="phone">
+        <div class="app">
+          <div class="sb"><span>9:41</span><div class="dots">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2a2f3d" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+            <svg viewBox="0 0 24 24" fill="#2a2f3d"><rect x="2" y="7" width="18" height="10" rx="2.5"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+          </div></div>
+          <div class="nav"><span class="back">‹</span><div><h2 style="font-size:19px">每周回顾</h2><div class="sub">6 月 · 第 5 周</div></div></div>
+          <div class="review">
+            <div class="sec">
+              <div class="sh"><div class="ix" style="background:var(--blue)">①</div><div class="ti">收件箱待理清</div><div class="cnt">8 条 ›</div></div>
+              <div class="sb2">
+                <div class="aitip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>积压有点多，建议现在花 10 分钟清掉。</div>
+                <div class="miniacts"><button class="mbtn go">去批量理清 →</button></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sh"><div class="ix" style="background:var(--beige)">②</div><div class="ti">孵化区回弹</div><div class="cnt">2 条</div></div>
+              <div class="sb2">
+                <div>
+                  <div class="item">研究 iOS 垂直领域</div>
+                  <div class="meta">已搁置 32 天 · 来自「将来也许」</div>
+                </div>
+                <div class="aitip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>一直没动——是时机未到，还是其实不想做了？</div>
+                <div class="miniacts"><button class="mbtn go">激活为项目</button><button class="mbtn">再等一个月</button><button class="mbtn warn">放手删除</button></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sh"><div class="ix" style="background:var(--amber)">③</div><div class="ti">项目健康度</div><div class="cnt">1 个</div></div>
+              <div class="sb2">
+                <div>
+                  <div class="item">学日语 · 没有下一步行动 ⚠</div>
+                  <div class="meta">项目里全是大目标，没有今天能动的一步</div>
+                </div>
+                <div class="miniacts"><button class="mbtn go">补一个下一步</button><button class="mbtn">归档项目</button></div>
+              </div>
+            </div>
+
+            <div class="sec">
+              <div class="sh"><div class="ix" style="background:var(--red)">④</div><div class="ti">僵尸任务</div><div class="cnt">1 条</div></div>
+              <div class="sb2">
+                <div>
+                  <div class="item">写周报</div>
+                  <div class="meta">被延期 5 次</div>
+                </div>
+                <div class="aitip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>反复推迟通常 = 太大、或其实没必要。</div>
+                <div class="miniacts"><button class="mbtn go">拆小</button><button class="mbtn">降级 someday</button><button class="mbtn warn">删除</button></div>
+              </div>
+            </div>
+
+            <div class="focusbox">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 5.2L19 9l-5.4 1.8L12 16l-1.6-5.2L5 9l5.4-1.8z"/></svg>
+              <div class="ft"><b>本周聚焦：</b>先把「酒吧组局」推进到发样片；学习类维持每日 15 分钟即可，别贪多。</div>
+            </div>
+          </div>
+          <div class="donebar"><span class="b">完成回顾 ✓</span></div>
+        </div>
+      </div>
+      <div class="screen-cap"><div class="k">③ 一键回顾 · 报告</div><div class="v">扫描全库 → 分区呈现问题 + 行内一键处理 + AI 聚焦建议</div></div>
+    </div>
+  </div>
+
+  <!-- 说明 -->
+  <div class="notes">
+    <div class="grp">设计要点</div>
+    <div class="note"><span class="n">1</span><div><b>零摩擦捕获不变</b>：AI 永远是「可选的帮手」，不点 ✨ 就直接进收件箱。理清是事后或批量做，不拖慢记录。</div></div>
+    <div class="note"><span class="n">2</span><div><b>AI 懂 GTD</b>：内化「可行动？单步/多步？2 分钟？情境？」决策树，会区分 念头 / 下一步 / 项目 / 参考 / 将来，信息不足时<b>主动二次提问</b>而非瞎猜。</div></div>
+    <div class="note"><span class="n">3</span><div><b>AI 只草拟、你拍板</b>：每条都能 采纳 / 改 / 忽略；批量时高置信度自动建议，只在模糊处打断你。</div></div>
+    <div class="note"><span class="n">4</span><div><b>回顾是信任底座</b>：孵化回弹 + 项目健康度 + 僵尸任务三类合成一份报告，行内就能处理，让搁置的事「定期被还回来」——这才敢真正清空大脑。</div></div>
+    <div class="note"><span class="n">5</span><div><b>成熟度贯穿</b>：念头→已澄清→已承诺→可行动→完成（或参考 / 放手）。AI 理清推着往前走，回顾防止卡死。</div></div>
+  </div>
+</body>
+</html>

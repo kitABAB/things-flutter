@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import '../../../ai/ai_providers.dart';
 import '../../../domain/models/item.dart';
 import '../../providers/item_providers.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_format.dart';
 import 'things_checkbox.dart';
 import 'progress_pie.dart';
+import 'clarify_sheet.dart';
 import 'when_picker_sheet.dart';
 
 /// 列表里的一行：任务 / 项目通用。
@@ -50,6 +52,9 @@ class ItemRow extends ConsumerWidget {
 
     if (selectionMode) return _selectableRow(context);
 
+    // 「理清」仅对任务、且已配置 AI 时出现。
+    final showClarify = item.isTask && ref.watch(aiEnabledProvider);
+
     return Slidable(
       key: ValueKey(item.id),
       startActionPane: ActionPane(
@@ -77,9 +82,17 @@ class ItemRow extends ConsumerWidget {
       ),
       endActionPane: ActionPane(
         motion: const ScrollMotion(),
-        extentRatio: 0.25,
+        extentRatio: showClarify ? 0.5 : 0.25,
         dismissible: DismissiblePane(onDismissed: () => repo.moveToTrash(item.id)),
         children: [
+          if (showClarify)
+            SlidableAction(
+              onPressed: (_) => ClarifySheet.show(context, item),
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+              icon: Icons.auto_awesome_rounded,
+              label: '理清',
+            ),
           SlidableAction(
             onPressed: (_) => repo.moveToTrash(item.id),
             backgroundColor: AppTheme.deadlineRed,

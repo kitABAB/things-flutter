@@ -111,6 +111,13 @@ class ItemRepository {
     ''', [title, DateTime.now().toIso8601String(), id]);
   }
 
+  /// 变更条目类型（AI 理清把一条任务转成项目时使用）。
+  Future<void> setType(String id, ItemType type) async {
+    await db.execute('''
+      UPDATE items SET type = ?, updated_at = ? WHERE id = ?
+    ''', [type.name, DateTime.now().toIso8601String(), id]);
+  }
+
   /// 设置调度意图（When）。这是「计划 / 今天 / 今晚 / 随时 / 将来」改期的统一入口。
   Future<void> setWhen(
     String id, {
@@ -779,6 +786,15 @@ class ItemRepository {
       WHERE type = 'project' AND status = 'open' AND trashed = 0
       ORDER BY sort_order ASC
     ''').map(_map);
+  }
+
+  /// 一次性取出全部活跃（open、未删除）的任务与项目，供「一键回顾」在内存中分类。
+  Future<List<Item>> activeSnapshot() async {
+    final rows = await db.getAll('''
+      SELECT * FROM items
+      WHERE type IN ('task','project') AND status = 'open' AND trashed = 0
+    ''');
+    return _map(rows);
   }
 
   /// 项目进度（活跃 + 已完成任务的比例）。

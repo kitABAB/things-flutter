@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'capture/capture_parser.dart';
+import 'clarify/clarify_service.dart';
 import 'config/ai_config.dart';
 import 'config/ai_settings_store.dart';
 import 'core/llm_client.dart';
 import 'providers/openai_compat_client.dart';
+import 'review/review_service.dart';
 
 /// 当前 AI 配置。
 ///
@@ -48,6 +50,16 @@ final llmClientProvider = Provider<LlmClient>((ref) {
 /// 「一句话拆解捕获」解析器。
 final captureParserProvider = Provider<CaptureParser>((ref) {
   return CaptureParser(ref.watch(llmClientProvider));
+});
+
+/// 「AI 理清」教练（单条 + 批量复用）。
+final clarifyServiceProvider = Provider<ClarifyService>((ref) {
+  return ClarifyService(ref.watch(llmClientProvider));
+});
+
+/// 「一键回顾」服务（本地扫描 + 可选 AI 建议）。
+final reviewServiceProvider = Provider<ReviewService>((ref) {
+  return ReviewService(ref.watch(llmClientProvider));
 });
 
 /// AI 功能是否就绪（决定 UI 入口是否点亮）。Key 未配置时整体优雅隐藏。
