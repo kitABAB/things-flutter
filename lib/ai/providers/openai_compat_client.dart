@@ -18,7 +18,7 @@ class OpenAiCompatClient implements LlmClient {
   final http.Client _http;
 
   OpenAiCompatClient(this.config, {http.Client? httpClient})
-      : _http = httpClient ?? http.Client();
+    : _http = httpClient ?? http.Client();
 
   @override
   bool get isConfigured => config.isReady;
@@ -35,6 +35,11 @@ class OpenAiCompatClient implements LlmClient {
     }
 
     final uri = Uri.parse('${_trimSlash(config.baseUrl)}/chat/completions');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      if (config.apiKey.trim().isNotEmpty)
+        'Authorization': 'Bearer ${config.apiKey.trim()}',
+    };
     final body = <String, dynamic>{
       'model': config.model,
       'temperature': temperature,
@@ -45,14 +50,7 @@ class OpenAiCompatClient implements LlmClient {
     http.Response resp;
     try {
       resp = await _http
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer ${config.apiKey}',
-            },
-            body: jsonEncode(body),
-          )
+          .post(uri, headers: headers, body: jsonEncode(body))
           .timeout(timeout);
     } on TimeoutException {
       throw LlmException(
@@ -61,10 +59,7 @@ class OpenAiCompatClient implements LlmClient {
       );
     } on Exception catch (e) {
       // 网络层错误（断网 / DNS / 证书等）一律视为可重试。
-      throw LlmException(
-        '网络连接失败，请检查网络后重试（${_briefCause(e)}）',
-        retryable: true,
-      );
+      throw LlmException('网络连接失败，请检查网络后重试（${_briefCause(e)}）', retryable: true);
     }
 
     if (resp.statusCode >= 400) {
@@ -97,20 +92,22 @@ class OpenAiCompatClient implements LlmClient {
     final uri = Uri.parse('${_trimSlash(config.baseUrl)}/models');
     http.Response resp;
     try {
-      resp = await _http.get(
-        uri,
-        headers: {'Authorization': 'Bearer ${config.apiKey}'},
-      ).timeout(timeout);
+      resp = await _http
+          .get(
+            uri,
+            headers: {
+              if (config.apiKey.trim().isNotEmpty)
+                'Authorization': 'Bearer ${config.apiKey.trim()}',
+            },
+          )
+          .timeout(timeout);
     } on TimeoutException {
       throw LlmException(
         '拉取模型列表超时（${timeout.inSeconds}s），请稍后重试',
         retryable: true,
       );
     } on Exception catch (e) {
-      throw LlmException(
-        '网络连接失败，请检查网络后重试（${_briefCause(e)}）',
-        retryable: true,
-      );
+      throw LlmException('网络连接失败，请检查网络后重试（${_briefCause(e)}）', retryable: true);
     }
 
     if (resp.statusCode >= 400) {

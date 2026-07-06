@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 策略组配置 · 卡片内联配置</title>
+<style>
+  :root{
+    --blue:#2F7AF7;
+    --blue-soft:#EAF2FF;
+    --green:#20B26B;
+    --green-soft:#EAF8F0;
+    --amber:#D99A00;
+    --amber-soft:#FFF6DB;
+    --red:#E5484D;
+    --red-soft:#FFF0F0;
+    --violet:#6A5CE7;
+    --violet-soft:#F1EFFF;
+    --teal:#13A9A0;
+    --teal-soft:#E7FAF8;
+    --ink:#181A20;
+    --text:#30323A;
+    --muted:#8B8E99;
+    --faint:#B7BAC5;
+    --line:#ECEEF3;
+    --fill:#F6F7FA;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(900px 580px at 12% -10%,rgba(47,122,247,.34),transparent 58%),
+      radial-gradient(720px 540px at 88% 0%,rgba(19,169,160,.22),transparent 62%),
+      linear-gradient(180deg,#101624,#0B0E16 76%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:34px 18px;
+  }
+  button,input{font:inherit}
+  .phone-shell{
+    width:390px;
+    padding:13px 12px;
+    border-radius:46px;
+    background:linear-gradient(145deg,#DCE9FA 0%,#F3E7D2 68%,#FFF8E8 100%);
+    box-shadow:0 36px 86px rgba(0,0,0,.48), inset 0 0 0 1.5px rgba(255,255,255,.68);
+  }
+  .phone{
+    height:810px;
+    border-radius:34px;
+    overflow:hidden;
+    background:linear-gradient(180deg,#FFFFFF 0%,#FBFCFF 52%,#FFFFFF 100%);
+    position:relative;
+    display:flex;
+    flex-direction:column;
+  }
+  .status{
+    height:36px;
+    padding:12px 23px 4px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    color:#2C3140;
+    font-size:12px;
+    font-weight:780;
+    flex:none;
+  }
+  .sys{display:flex;gap:5px;align-items:center}
+  .sys svg{width:15px;height:15px}
+  .topbar{
+    min-height:64px;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:8px 18px 12px;
+    flex:none;
+  }
+  .back{
+    width:27px;height:36px;border:0;background:transparent;color:var(--faint);
+    display:flex;align-items:center;justify-content:flex-start;cursor:pointer;
+  }
+  .back svg{width:22px;height:22px}
+  .title-stack{min-width:0;flex:1}
+  .group-name{
+    width:100%;
+    border:0;
+    outline:none;
+    background:transparent;
+    color:var(--ink);
+    font-size:24px;
+    line-height:1.05;
+    font-weight:880;
+    letter-spacing:0;
+  }
+  .save-state{
+    margin-top:4px;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    color:var(--muted);
+    font-size:11px;
+    font-weight:700;
+    transition:.2s color;
+  }
+  .save-dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 0 0 rgba(32,178,107,.28);
+  }
+  .save-state.draft .save-dot{background:var(--amber)}
+  .save-state.flash{color:var(--green)}
+  .save-state.draft.flash{color:var(--amber)}
+  .save-state.flash .save-dot{animation:savePulse .72s ease-out}
+  .top-actions{display:flex;gap:7px;align-items:center}
+  .icon-btn{
+    width:38px;height:38px;border:0;border-radius:15px;
+    background:var(--fill);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    transition:.18s transform,.18s background,.18s color,.18s box-shadow;
+  }
+  .icon-btn svg{width:19px;height:19px}
+  .icon-btn:hover{background:#EEF2F8;transform:translateY(-1px)}
+  .icon-btn.primary{background:var(--blue);color:#fff;box-shadow:0 12px 24px rgba(47,122,247,.26)}
+  .icon-btn.testing{color:var(--blue);animation:boltSpin .72s ease-in-out infinite}
+
+  .screen{
+    flex:1;
+    overflow:auto;
+    padding:4px 18px 18px;
+    scrollbar-width:none;
+  }
+  .screen::-webkit-scrollbar{display:none}
+  .model-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:2px 0 12px;
+  }
+  .model-card{
+    border:1px solid var(--line);
+    border-radius:22px;
+    box-shadow:0 8px 22px rgba(22,28,42,.06);
+    overflow:hidden;
+    animation:cardIn .36s cubic-bezier(.2,.82,.22,1.15) both;
+    transition:.22s transform,.22s box-shadow,.22s border-color,.22s background;
+  }
+  .model-card[data-kind="cloud"]{background:linear-gradient(145deg,#FFFFFF 0%,#F7FAFF 100%)}
+  .model-card[data-kind="gateway"]{background:linear-gradient(145deg,#FEFCFF 0%,#F6F0FF 100%);border-color:#E7DFFF}
+  .model-card[data-complete="false"]{border-color:#F1D184}
+  .model-card.dragging{opacity:.94;transform:scale(1.02) rotate(-.25deg);box-shadow:0 24px 52px rgba(22,28,42,.22);border-color:#C6D9FF}
+  .card-top{
+    min-height:76px;
+    display:grid;
+    grid-template-columns:25px 44px 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:13px 12px;
+    cursor:pointer;
+  }
+  .handle{width:25px;color:#C3C6D0;display:flex;align-items:center;justify-content:center;cursor:grab}
+  .handle svg{width:18px;height:18px}
+  .logo{
+    width:44px;height:44px;border-radius:16px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:15px;flex:none;
+  }
+  .logo.gemini{background:#EEF3FF;color:#586BEF}
+  .logo.deep{background:var(--teal-soft);color:var(--teal)}
+  .logo.openai{background:#F1F2F5;color:#17171C}
+  .logo.gateway{background:var(--violet-soft);color:var(--violet)}
+  .logo.draft{background:var(--amber-soft);color:var(--amber)}
+  .m-title{
+    font-size:15px;
+    font-weight:880;
+    color:var(--ink);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    letter-spacing:0;
+  }
+  .m-meta{
+    margin-top:5px;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:11.5px;
+    color:var(--muted);
+    font-weight:700;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .status-dot{
+    width:9px;height:9px;border-radius:50%;flex:none;
+    box-shadow:0 0 0 3px rgba(255,255,255,.9),0 0 0 4px rgba(20,28,44,.04);
+  }
+  .status-dot.ok{background:var(--green)}
+  .status-dot.pending{background:var(--amber)}
+  .status-dot.fail{background:var(--red)}
+  .warn{
+    width:21px;height:21px;border-radius:9px;
+    display:none;
+    align-items:center;justify-content:center;
+    background:var(--amber-soft);color:var(--amber);
+  }
+  .model-card[data-complete="false"] .warn{display:flex}
+  .warn svg{width:14px;height:14px}
+  .card-actions{display:flex;align-items:center;gap:6px}
+  .mini-btn{
+    width:34px;height:34px;border:0;border-radius:13px;
+    display:flex;align-items:center;justify-content:center;
+    background:#F5F7FB;color:#555B68;
+    cursor:pointer;
+    transition:.16s transform,.16s background,.16s color;
+  }
+  .mini-btn svg{width:17px;height:17px}
+  .mini-btn:hover{transform:translateY(-1px);background:#EEF2F8;color:var(--blue)}
+  .mini-btn.testing{background:var(--blue-soft);color:var(--blue);animation:boltSpin .72s ease-in-out infinite}
+  .mini-btn.success{background:var(--green-soft);color:var(--green)}
+  .mini-btn.fail{background:var(--red-soft);color:var(--red)}
+  .expand-btn svg{transition:.2s transform}
+  .model-card.expanded .expand-btn svg{transform:rotate(180deg)}
+
+  .config{
+    display:grid;
+    grid-template-rows:0fr;
+    opacity:0;
+    transition:.26s grid-template-rows,.2s opacity;
+  }
+  .model-card.expanded .config{grid-template-rows:1fr;opacity:1}
+  .config-inner{
+    overflow:hidden;
+    padding:0 12px 13px;
+    display:flex;
+    flex-direction:column;
+    gap:11px;
+  }
+  .mode{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:4px;
+    padding:4px;
+    border-radius:16px;
+    background:rgba(245,247,250,.92);
+  }
+  .mode button{
+    border:0;
+    border-radius:13px;
+    padding:9px 6px;
+    background:transparent;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:850;
+    cursor:pointer;
+  }
+  .mode button.active{background:#fff;color:var(--blue);box-shadow:0 3px 12px rgba(20,28,44,.07)}
+  .inline-search,.field{
+    min-height:42px;
+    border:1.3px solid #E1E4EC;
+    border-radius:15px;
+    background:#fff;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:0 11px;
+    color:var(--muted);
+    font-size:12.5px;
+    font-weight:730;
+    transition:.16s border-color,.16s box-shadow;
+  }
+  .inline-search svg,.field svg{width:16px;height:16px;flex:none}
+  .field:focus-within{border-color:#AFC8FF;box-shadow:0 0 0 4px rgba(47,122,247,.08)}
+  .field input{
+    min-width:0;
+    flex:1;
+    border:0;
+    outline:none;
+    background:transparent;
+    color:var(--text);
+    font-size:12.8px;
+    font-weight:760;
+  }
+  .field.mono input{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.6px}
+  .chips{display:flex;gap:7px;overflow:hidden}
+  .chip{
+    border:0;
+    border-radius:999px;
+    background:#F1F3F7;
+    color:var(--muted);
+    padding:7px 10px;
+    font-size:11.5px;
+    font-weight:830;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  .chip.active{background:var(--blue-soft);color:var(--blue)}
+  .model-picks{display:flex;flex-direction:column;gap:7px}
+  .pick{
+    display:grid;
+    grid-template-columns:34px 1fr auto;
+    gap:9px;
+    align-items:center;
+    padding:9px;
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:15px;
+    cursor:pointer;
+    transition:.16s border-color,.16s background,.16s transform;
+  }
+  .pick:hover{transform:translateY(-1px)}
+  .pick.selected{border-color:#9BBEFF;background:#F7FAFF}
+  .pick .logo{width:34px;height:34px;border-radius:13px;font-size:13px}
+  .pick-title{font-size:12.8px;font-weight:860;color:var(--ink)}
+  .pick-sub{font-size:10.8px;color:var(--muted);font-weight:720;margin-top:2px}
+  .check{
+    width:22px;height:22px;border-radius:50%;
+    background:var(--blue);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    opacity:0;transform:scale(.74);
+    transition:.16s opacity,.16s transform;
+  }
+  .pick.selected .check{opacity:1;transform:scale(1)}
+  .check svg{width:14px;height:14px}
+  .form-grid{display:flex;flex-direction:column;gap:9px}
+  .seg{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    background:rgba(245,247,250,.92);
+    padding:3px;
+    gap:3px;
+    border-radius:15px;
+  }
+  .seg button{
+    border:0;background:transparent;border-radius:12px;padding:8px 4px;
+    font-size:11.5px;font-weight:850;color:var(--muted);
+    cursor:pointer;
+  }
+  .seg button.active{background:#fff;color:var(--blue);box-shadow:0 2px 8px rgba(20,28,44,.07)}
+  .gateway-tools{display:flex;gap:8px;align-items:center}
+  .tool-btn{
+    border:0;
+    border-radius:15px;
+    min-height:40px;
+    padding:0 12px;
+    background:#F1F3F7;
+    color:var(--text);
+    font-size:12px;
+    font-weight:840;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    cursor:pointer;
+  }
+  .tool-btn svg{width:15px;height:15px}
+  .protocol-toggle{
+    border:0;
+    background:transparent;
+    color:var(--muted);
+    font-size:12px;
+    font-weight:820;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    cursor:pointer;
+    padding:0 2px;
+  }
+  .protocol-toggle svg{width:15px;height:15px;transition:.2s transform}
+  .protocol-toggle.open svg{transform:rotate(180deg)}
+  .protocol-note{
+    display:grid;
+    grid-template-rows:0fr;
+    opacity:0;
+    transition:.24s grid-template-rows,.24s opacity;
+  }
+  .protocol-note.open{grid-template-rows:1fr;opacity:1}
+  .protocol-inner{overflow:hidden}
+  .protocol-inner div{
+    border-radius:14px;
+    background:var(--amber-soft);
+    color:#71540B;
+    font-size:11px;
+    line-height:1.5;
+    font-weight:690;
+    padding:10px 11px;
+  }
+  .gateway-models{
+    display:none;
+    gap:7px;
+    flex-wrap:wrap;
+  }
+  .gateway-models.show{display:flex;animation:tabIn .22s ease both}
+  .model-token{
+    border:1px solid #D7E2F7;
+    background:#fff;
+    color:var(--text);
+    border-radius:999px;
+    padding:7px 10px;
+    font-size:11.5px;
+    font-weight:800;
+  }
+  .model-token.active{border-color:#9BBEFF;background:var(--blue-soft);color:var(--blue)}
+  .errors{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    min-height:24px;
+  }
+  .error-pill{
+    display:none;
+    align-items:center;
+    gap:4px;
+    border-radius:999px;
+    padding:5px 8px;
+    background:var(--amber-soft);
+    color:#8B6508;
+    font-size:10.8px;
+    font-weight:820;
+  }
+  .error-pill.show{display:flex}
+  .error-pill svg{width:12px;height:12px}
+  .add-card{
+    height:58px;
+    border:1.5px dashed #CFD8EA;
+    border-radius:20px;
+    background:linear-gradient(145deg,#FAFCFF,#F5F8FF);
+    color:var(--blue);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:.18s transform,.18s background,.18s border-color,.18s box-shadow;
+  }
+  .add-card svg{width:22px;height:22px}
+  .add-card:hover{transform:translateY(-1px);background:#F1F6FF;border-color:#AFC8FF;box-shadow:0 14px 30px rgba(47,122,247,.10)}
+
+  .sheet-scrim{
+    position:absolute;
+    inset:0;
+    background:rgba(12,16,28,.28);
+    backdrop-filter:blur(7px);
+    display:none;
+    align-items:flex-end;
+    z-index:36;
+  }
+  .sheet-scrim.show{display:flex;animation:fadeIn .18s ease both}
+  .sheet{
+    width:100%;
+    background:#fff;
+    border-radius:30px 30px 34px 34px;
+    padding:8px 18px 18px;
+    box-shadow:0 -20px 70px rgba(17,23,36,.24);
+    animation:sheetIn .38s cubic-bezier(.18,.88,.22,1.08) both;
+  }
+  .grab{width:42px;height:5px;border-radius:4px;background:#DFE1E8;margin:2px auto 13px}
+  .sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .sheet-head h3{font-size:18px;font-weight:880;color:var(--ink)}
+  .spacer{flex:1}
+  .close{
+    width:34px;height:34px;border:0;border-radius:13px;background:var(--fill);color:var(--muted);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .close svg{width:17px;height:17px}
+  .mapping{display:flex;flex-direction:column;gap:9px}
+  .map-row{
+    display:grid;
+    grid-template-columns:36px 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:12px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+  }
+  .map-ico{width:36px;height:36px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:900}
+  .map-ico.blue{background:var(--blue-soft);color:var(--blue)}
+  .map-ico.green{background:var(--green-soft);color:var(--green)}
+  .map-ico.violet{background:var(--violet-soft);color:var(--violet)}
+  .chev{color:var(--faint);display:flex}
+  .chev svg{width:18px;height:18px}
+  .toast{
+    position:absolute;
+    left:50%;
+    bottom:24px;
+    transform:translate(-50%,20px);
+    opacity:0;
+    z-index:60;
+    padding:10px 13px;
+    border-radius:16px;
+    background:rgba(20,24,34,.9);
+    color:#fff;
+    font-size:12px;
+    font-weight:760;
+    box-shadow:0 18px 42px rgba(0,0,0,.22);
+    pointer-events:none;
+  }
+  .toast.show{animation:toast .9s ease both}
+
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes sheetIn{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+  @keyframes tabIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  @keyframes cardIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  @keyframes savePulse{0%{box-shadow:0 0 0 0 rgba(32,178,107,.34)}100%{box-shadow:0 0 0 14px rgba(32,178,107,0)}}
+  @keyframes boltSpin{0%,100%{transform:rotate(0deg) scale(1)}50%{transform:rotate(-10deg) scale(1.08)}}
+  @keyframes toast{
+    0%{opacity:0;transform:translate(-50%,20px)}
+    18%,78%{opacity:1;transform:translate(-50%,0)}
+    100%{opacity:0;transform:translate(-50%,-8px)}
+  }
+  @keyframes pulseAdd{
+    0%{box-shadow:0 0 0 0 rgba(47,122,247,.35)}
+    100%{box-shadow:0 0 0 18px rgba(47,122,247,0)}
+  }
+</style>
+</head>
+<body>
+  <div class="phone-shell">
+    <div class="phone" id="phone">
+      <div class="status">
+        <span>9:41</span>
+        <span class="sys">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#2C3140" stroke-width="2"><path d="M2 8c6-5 14-5 20 0M5 12c4-3 10-3 14 0M8.5 15.5c2-1.5 5-1.5 7 0"/></svg>
+          <svg viewBox="0 0 24 24" fill="#2C3140"><rect x="2" y="7" width="18" height="10" rx="2.4"/><rect x="21" y="10" width="1.6" height="4" rx="1"/></svg>
+        </span>
+      </div>
+
+      <div class="topbar">
+        <button class="back" aria-label="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="title-stack">
+          <input class="group-name" id="groupName" value="策略组 1" aria-label="策略组名称" />
+          <div class="save-state" id="saveState"><span class="save-dot"></span><span id="saveText">已自动保存</span></div>
+        </div>
+        <div class="top-actions">
+          <button class="icon-btn" id="openAdvanced" aria-label="功能映射">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M8 5v4M16 15v4"/></svg>
+          </button>
+          <button class="icon-btn" id="batchTest" aria-label="批量测试">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.6 4.8 13.1c-.42.5-.06 1.26.59 1.26h5.11l-1.2 6.56c-.15.83.89 1.31 1.41.65l8.62-10.96c.4-.51.04-1.25-.6-1.25h-5.05l1.21-6.1c.17-.84-.84-1.32-1.39-.66Z"/></svg>
+          </button>
+          <button class="icon-btn primary" id="topAdd" aria-label="添加">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="screen" id="screen">
+        <div class="model-list" id="modelList">
+          <article class="model-card" draggable="true" data-kind="cloud" data-logo="gemini" data-provider="Google" data-status="ok" data-complete="true">
+            <div class="card-top">
+              <div class="handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h8M8 12h8M8 18h8"/></svg></div>
+              <div class="logo gemini">G</div>
+              <div>
+                <div class="m-title">Gemini 2.5 Flash</div>
+                <div class="m-meta"><span>Google</span><span class="status-dot ok" title="连通" aria-label="连通"></span></div>
+              </div>
+              <div class="card-actions">
+                <span class="warn" title="配置未完成"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/></svg></span>
+                <button class="mini-btn test-one" aria-label="测试"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.6 4.8 13.1c-.42.5-.06 1.26.59 1.26h5.11l-1.2 6.56c-.15.83.89 1.31 1.41.65l8.62-10.96c.4-.51.04-1.25-.6-1.25h-5.05l1.21-6.1c.17-.84-.84-1.32-1.39-.66Z"/></svg></button>
+                <button class="mini-btn expand-btn" aria-label="展开"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+            </div>
+            <div class="config"><div class="config-inner">
+              <div class="mode"><button class="active" data-mode="cloud">云模型</button><button data-mode="gateway">网关</button></div>
+              <div class="inline-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>gpt / gemini / deepseek</div>
+              <div class="model-picks cloud-pane">
+                <div class="pick selected" data-title="Gemini 2.5 Flash" data-provider="Google" data-logo="gemini" data-letter="G" data-key="AIza••••1234"><div class="logo gemini">G</div><div><div class="pick-title">Gemini 2.5 Flash</div><div class="pick-sub">Google · 快速</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+                <div class="pick" data-title="DeepSeek Chat" data-provider="DeepSeek" data-logo="deep" data-letter="D" data-key="sk••••8420"><div class="logo deep">D</div><div><div class="pick-title">DeepSeek Chat</div><div class="pick-sub">DeepSeek · 中文理清</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+              </div>
+              <div class="field mono"><input class="key-input" value="AIza••••1234" placeholder="API Key" aria-label="API Key"></div>
+              <div class="errors"><span class="error-pill key-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 API Key</span></div>
+            </div></div>
+          </article>
+
+          <article class="model-card" draggable="true" data-kind="gateway" data-logo="gateway" data-provider="自定义网关" data-status="pending" data-complete="true">
+            <div class="card-top">
+              <div class="handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h8M8 12h8M8 18h8"/></svg></div>
+              <div class="logo gateway">Q</div>
+              <div>
+                <div class="m-title">公司 Qwen 网关 / qwen-plus</div>
+                <div class="m-meta"><span>自定义网关</span><span class="status-dot pending" title="未测" aria-label="未测"></span></div>
+              </div>
+              <div class="card-actions">
+                <span class="warn" title="配置未完成"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/></svg></span>
+                <button class="mini-btn test-one" aria-label="测试"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.6 4.8 13.1c-.42.5-.06 1.26.59 1.26h5.11l-1.2 6.56c-.15.83.89 1.31 1.41.65l8.62-10.96c.4-.51.04-1.25-.6-1.25h-5.05l1.21-6.1c.17-.84-.84-1.32-1.39-.66Z"/></svg></button>
+                <button class="mini-btn expand-btn" aria-label="展开"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+            </div>
+            <div class="config"><div class="config-inner">
+              <div class="mode"><button data-mode="cloud">云模型</button><button class="active" data-mode="gateway">网关</button></div>
+              <div class="form-grid gateway-pane">
+                <div class="field"><input class="gateway-name" value="公司 Qwen 网关" placeholder="网关名称" aria-label="网关名称"></div>
+                <div class="field mono"><input class="base-url" value="https://llm.company.com/v1" placeholder="Base URL" aria-label="Base URL"></div>
+                <div class="field mono"><input class="gateway-key" value="" placeholder="API Key 可选" aria-label="API Key"></div>
+                <div class="seg"><button class="active">Bearer</button><button>无</button><button>Header</button></div>
+                <div class="gateway-tools"><button class="tool-btn fetch-models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>拉取</button><button class="protocol-toggle">协议要求 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+                <div class="protocol-note"><div class="protocol-inner"><div>兼容 OpenAI Chat Completions：POST {baseUrl}/chat/completions。可选 GET {baseUrl}/models。</div></div></div>
+                <div class="gateway-models show"><span class="model-token active">qwen-plus</span><span class="model-token">qwen-max</span></div>
+              </div>
+              <div class="errors"><span class="error-pill base-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 Base URL</span><span class="error-pill model-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺模型</span></div>
+            </div></div>
+          </article>
+
+          <article class="model-card expanded" draggable="true" data-kind="cloud" data-logo="draft" data-provider="云模型" data-status="pending" data-complete="false">
+            <div class="card-top">
+              <div class="handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h8M8 12h8M8 18h8"/></svg></div>
+              <div class="logo draft">+</div>
+              <div>
+                <div class="m-title">选择模型</div>
+                <div class="m-meta"><span>云模型</span><span class="status-dot pending" title="未生效" aria-label="未生效"></span></div>
+              </div>
+              <div class="card-actions">
+                <span class="warn" title="配置未完成"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/></svg></span>
+                <button class="mini-btn test-one" aria-label="测试"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.6 4.8 13.1c-.42.5-.06 1.26.59 1.26h5.11l-1.2 6.56c-.15.83.89 1.31 1.41.65l8.62-10.96c.4-.51.04-1.25-.6-1.25h-5.05l1.21-6.1c.17-.84-.84-1.32-1.39-.66Z"/></svg></button>
+                <button class="mini-btn expand-btn" aria-label="收起"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>
+              </div>
+            </div>
+            <div class="config"><div class="config-inner">
+              <div class="mode"><button class="active" data-mode="cloud">云模型</button><button data-mode="gateway">网关</button></div>
+              <div class="inline-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>gpt / gemini / deepseek</div>
+              <div class="chips"><button class="chip active">全部</button><button class="chip">OpenAI</button><button class="chip">Gemini</button><button class="chip">DeepSeek</button></div>
+              <div class="model-picks cloud-pane">
+                <div class="pick selected" data-title="GPT-4.1 mini" data-provider="OpenAI" data-logo="openai" data-letter="O" data-key=""><div class="logo openai">O</div><div><div class="pick-title">GPT-4.1 mini</div><div class="pick-sub">OpenAI · 通用</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+                <div class="pick" data-title="DeepSeek Chat" data-provider="DeepSeek" data-logo="deep" data-letter="D" data-key="sk••••8420"><div class="logo deep">D</div><div><div class="pick-title">DeepSeek Chat</div><div class="pick-sub">DeepSeek · 中文理清</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+              </div>
+              <div class="field mono"><input class="key-input" value="" placeholder="API Key" aria-label="API Key"></div>
+              <div class="errors"><span class="error-pill key-error show"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 API Key</span></div>
+            </div></div>
+          </article>
+        </div>
+
+        <button class="add-card" id="addCard" aria-label="添加">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+
+      <div class="sheet-scrim" id="advancedScrim">
+        <div class="sheet" id="advancedSheet">
+          <div class="grab"></div>
+          <div class="sheet-head">
+            <h3>功能策略</h3>
+            <span class="spacer"></span>
+            <button class="close" id="closeAdvanced" aria-label="关闭">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="mapping">
+            <div class="map-row"><div class="map-ico blue">C</div><div><div class="m-title">智能捕获</div><div class="m-meta">策略组 1</div></div><div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></div>
+            <div class="map-row"><div class="map-ico violet">A</div><div><div class="m-title">AI 理清</div><div class="m-meta">理清强模型组</div></div><div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></div>
+            <div class="map-row"><div class="map-ico green">R</div><div><div class="m-title">回顾建议</div><div class="m-meta">策略组 1</div></div><div class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="toast">已自动保存</div>
+    </div>
+  </div>
+
+<script>
+  const modelList = document.getElementById('modelList');
+  const saveState = document.getElementById('saveState');
+  const saveText = document.getElementById('saveText');
+  const toast = document.getElementById('toast');
+  const screen = document.getElementById('screen');
+  let dragged = null;
+
+  function flashSave(message = '已自动保存', draft = false){
+    saveState.classList.toggle('draft', draft);
+    saveText.textContent = message;
+    saveState.classList.remove('flash');
+    void saveState.offsetWidth;
+    saveState.classList.add('flash');
+    toast.textContent = message;
+    toast.classList.remove('show');
+    void toast.offsetWidth;
+    toast.classList.add('show');
+  }
+
+  function statusMeta(provider, status){
+    const cls = status === 'ok' ? 'ok' : status === 'fail' ? 'fail' : 'pending';
+    const label = status === 'ok' ? '连通' : status === 'fail' ? '失败' : '未生效';
+    return `<span>${provider}</span><span class="status-dot ${cls}" title="${label}" aria-label="${label}"></span>`;
+  }
+
+  function setCardStatus(card, status){
+    card.dataset.status = status;
+    card.querySelector('.m-meta').innerHTML = statusMeta(card.dataset.provider, status);
+  }
+
+  function setCloudCardFromPick(card, pick){
+    card.dataset.kind = 'cloud';
+    card.dataset.logo = pick.dataset.logo;
+    card.dataset.provider = pick.dataset.provider;
+    card.querySelector('.m-title').textContent = pick.dataset.title;
+    const logo = card.querySelector('.card-top .logo');
+    logo.className = `logo ${pick.dataset.logo}`;
+    logo.textContent = pick.dataset.letter;
+    const keyInput = card.querySelector('.key-input');
+    if (!keyInput.value && pick.dataset.key) keyInput.value = pick.dataset.key;
+    validateCard(card);
+  }
+
+  function showCloud(card){
+    card.dataset.kind = 'cloud';
+    card.querySelectorAll('.mode button').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === 'cloud'));
+    const config = card.querySelector('.config-inner');
+    const hasCloudPane = Boolean(config.querySelector('.cloud-pane'));
+    if (!hasCloudPane) {
+      config.querySelectorAll('.form-grid,.errors').forEach(item => item.remove());
+      config.insertAdjacentHTML('beforeend', `
+        <div class="inline-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>gpt / gemini / deepseek</div>
+        <div class="model-picks cloud-pane">
+          <div class="pick selected" data-title="Gemini 2.5 Flash" data-provider="Google" data-logo="gemini" data-letter="G" data-key="AIza••••1234"><div class="logo gemini">G</div><div><div class="pick-title">Gemini 2.5 Flash</div><div class="pick-sub">Google · 快速</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+          <div class="pick" data-title="DeepSeek Chat" data-provider="DeepSeek" data-logo="deep" data-letter="D" data-key="sk••••8420"><div class="logo deep">D</div><div><div class="pick-title">DeepSeek Chat</div><div class="pick-sub">DeepSeek · 中文理清</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+        </div>
+        <div class="field mono"><input class="key-input" value="AIza••••1234" placeholder="API Key" aria-label="API Key"></div>
+        <div class="errors"><span class="error-pill key-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 API Key</span></div>`);
+      bindConfig(card);
+    }
+    const firstPick = card.querySelector('.pick.selected');
+    if (firstPick) setCloudCardFromPick(card, firstPick);
+  }
+
+  function showGateway(card){
+    card.dataset.kind = 'gateway';
+    card.dataset.logo = 'gateway';
+    card.dataset.provider = '自定义网关';
+    card.querySelectorAll('.mode button').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === 'gateway'));
+    const logo = card.querySelector('.card-top .logo');
+    logo.className = 'logo gateway';
+    logo.textContent = 'Q';
+    card.querySelector('.m-title').textContent = '公司网关 / qwen-plus';
+    card.querySelectorAll('.inline-search,.chips,.model-picks,.field,.errors,.form-grid').forEach(item => item.remove());
+    card.querySelector('.config-inner').insertAdjacentHTML('beforeend', `
+      <div class="form-grid gateway-pane">
+        <div class="field"><input class="gateway-name" value="公司网关" placeholder="网关名称" aria-label="网关名称"></div>
+        <div class="field mono"><input class="base-url" value="" placeholder="Base URL" aria-label="Base URL"></div>
+        <div class="field mono"><input class="gateway-key" value="" placeholder="API Key 可选" aria-label="API Key"></div>
+        <div class="seg"><button class="active">Bearer</button><button>无</button><button>Header</button></div>
+        <div class="gateway-tools"><button class="tool-btn fetch-models"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>拉取</button><button class="protocol-toggle">协议要求 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+        <div class="protocol-note"><div class="protocol-inner"><div>兼容 OpenAI Chat Completions：POST {baseUrl}/chat/completions。可选 GET {baseUrl}/models。</div></div></div>
+        <div class="gateway-models"><span class="model-token active">qwen-plus</span><span class="model-token">qwen-max</span></div>
+      </div>
+      <div class="errors"><span class="error-pill base-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 Base URL</span><span class="error-pill model-error"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺模型</span></div>`);
+    bindConfig(card);
+    validateCard(card);
+  }
+
+  function validateCard(card){
+    let complete = true;
+    if (card.dataset.kind === 'cloud') {
+      const keyInput = card.querySelector('.key-input');
+      complete = Boolean(keyInput && keyInput.value.trim());
+      const keyError = card.querySelector('.key-error');
+      if (keyError) keyError.classList.toggle('show', !complete);
+    } else {
+      const baseUrl = card.querySelector('.base-url');
+      const model = card.querySelector('.model-token.active');
+      const baseOk = Boolean(baseUrl && baseUrl.value.trim().startsWith('http'));
+      const modelOk = Boolean(model);
+      complete = baseOk && modelOk;
+      const baseError = card.querySelector('.base-error');
+      const modelError = card.querySelector('.model-error');
+      if (baseError) baseError.classList.toggle('show', !baseOk);
+      if (modelError) modelError.classList.toggle('show', !modelOk);
+    }
+    card.dataset.complete = complete ? 'true' : 'false';
+    setCardStatus(card, complete ? card.dataset.status === 'fail' ? 'fail' : 'ok' : 'pending');
+    flashSave(complete ? '已自动保存' : '草稿已保存', !complete);
+    return complete;
+  }
+
+  function testButton(button, card){
+    if (card.dataset.complete !== 'true') {
+      button.classList.add('fail');
+      setTimeout(() => button.classList.remove('fail'), 650);
+      flashSave('草稿已保存', true);
+      return;
+    }
+    button.classList.remove('success','fail');
+    button.classList.add('testing');
+    setTimeout(() => {
+      button.classList.remove('testing');
+      button.classList.add('success');
+      setCardStatus(card, 'ok');
+      flashSave('测试完成');
+      setTimeout(() => button.classList.remove('success'), 900);
+    }, 720);
+  }
+
+  function bindConfig(card){
+    card.querySelectorAll('.mode button').forEach(btn => {
+      btn.onclick = event => {
+        event.stopPropagation();
+        btn.dataset.mode === 'gateway' ? showGateway(card) : showCloud(card);
+      };
+    });
+    card.querySelectorAll('.pick').forEach(pick => {
+      pick.onclick = event => {
+        event.stopPropagation();
+        card.querySelectorAll('.pick').forEach(item => item.classList.remove('selected'));
+        pick.classList.add('selected');
+        setCloudCardFromPick(card, pick);
+      };
+    });
+    card.querySelectorAll('input').forEach(input => {
+      input.oninput = () => validateCard(card);
+    });
+    card.querySelectorAll('.seg button').forEach(button => {
+      button.onclick = event => {
+        event.stopPropagation();
+        button.parentElement.querySelectorAll('button').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+        flashSave();
+      };
+    });
+    card.querySelectorAll('.fetch-models').forEach(button => {
+      button.onclick = event => {
+        event.stopPropagation();
+        card.querySelector('.gateway-models')?.classList.add('show');
+        validateCard(card);
+      };
+    });
+    card.querySelectorAll('.protocol-toggle').forEach(button => {
+      button.onclick = event => {
+        event.stopPropagation();
+        button.classList.toggle('open');
+        card.querySelector('.protocol-note')?.classList.toggle('open');
+      };
+    });
+    card.querySelectorAll('.model-token').forEach(token => {
+      token.onclick = event => {
+        event.stopPropagation();
+        token.classList.toggle('active');
+        validateCard(card);
+      };
+    });
+  }
+
+  function bindCard(card){
+    card.addEventListener('dragstart', () => {
+      dragged = card;
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      dragged = null;
+      flashSave();
+    });
+    card.querySelector('.card-top').addEventListener('click', event => {
+      if (event.target.closest('button') || event.target.closest('.handle')) return;
+      card.classList.toggle('expanded');
+    });
+    card.querySelector('.expand-btn').addEventListener('click', event => {
+      event.stopPropagation();
+      card.classList.toggle('expanded');
+      if (card.dataset.complete !== 'true') flashSave('草稿已保存', true);
+    });
+    card.querySelector('.test-one').addEventListener('click', event => {
+      event.stopPropagation();
+      testButton(event.currentTarget, card);
+    });
+    bindConfig(card);
+    validateCard(card);
+  }
+
+  function createDraftCard(){
+    const card = document.createElement('article');
+    card.className = 'model-card expanded';
+    card.draggable = true;
+    card.dataset.kind = 'cloud';
+    card.dataset.logo = 'draft';
+    card.dataset.provider = '云模型';
+    card.dataset.status = 'pending';
+    card.dataset.complete = 'false';
+    card.innerHTML = `
+      <div class="card-top">
+        <div class="handle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h8M8 12h8M8 18h8"/></svg></div>
+        <div class="logo draft">+</div>
+        <div><div class="m-title">选择模型</div><div class="m-meta">${statusMeta('云模型','pending')}</div></div>
+        <div class="card-actions"><span class="warn" title="配置未完成"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Zm1 14h-2v2h2v-2Zm0-7h-2v5h2V9Z"/></svg></span><button class="mini-btn test-one" aria-label="测试"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.6 4.8 13.1c-.42.5-.06 1.26.59 1.26h5.11l-1.2 6.56c-.15.83.89 1.31 1.41.65l8.62-10.96c.4-.51.04-1.25-.6-1.25h-5.05l1.21-6.1c.17-.84-.84-1.32-1.39-.66Z"/></svg></button><button class="mini-btn expand-btn" aria-label="收起"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+      </div>
+      <div class="config"><div class="config-inner">
+        <div class="mode"><button class="active" data-mode="cloud">云模型</button><button data-mode="gateway">网关</button></div>
+        <div class="inline-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>gpt / gemini / deepseek</div>
+        <div class="model-picks cloud-pane">
+          <div class="pick selected" data-title="GPT-4.1 mini" data-provider="OpenAI" data-logo="openai" data-letter="O" data-key=""><div class="logo openai">O</div><div><div class="pick-title">GPT-4.1 mini</div><div class="pick-sub">OpenAI · 通用</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+          <div class="pick" data-title="DeepSeek Chat" data-provider="DeepSeek" data-logo="deep" data-letter="D" data-key="sk••••8420"><div class="logo deep">D</div><div><div class="pick-title">DeepSeek Chat</div><div class="pick-sub">DeepSeek · 中文理清</div></div><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div></div>
+        </div>
+        <div class="field mono"><input class="key-input" value="" placeholder="API Key" aria-label="API Key"></div>
+        <div class="errors"><span class="error-pill key-error show"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.8 20h20.4L12 2Z"/></svg>缺 API Key</span></div>
+      </div></div>`;
+    bindCard(card);
+    return card;
+  }
+
+  document.querySelectorAll('.model-card').forEach(bindCard);
+  modelList.addEventListener('dragover', event => {
+    event.preventDefault();
+    const after = getDragAfterElement(modelList, event.clientY);
+    if (!dragged) return;
+    if (after == null) modelList.appendChild(dragged);
+    else modelList.insertBefore(dragged, after);
+  });
+  function getDragAfterElement(container, y){
+    const els = [...container.querySelectorAll('.model-card:not(.dragging)')];
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return {offset, element: child};
+      return closest;
+    }, {offset: Number.NEGATIVE_INFINITY}).element;
+  }
+
+  function addDraft(){
+    const card = createDraftCard();
+    modelList.appendChild(card);
+    card.style.animation = 'cardIn .42s cubic-bezier(.2,.82,.22,1.15) both, pulseAdd .7s ease-out .08s';
+    flashSave('草稿已保存', true);
+    setTimeout(() => screen.scrollTo({top: screen.scrollHeight, behavior:'smooth'}), 60);
+  }
+  document.getElementById('topAdd').addEventListener('click', addDraft);
+  document.getElementById('addCard').addEventListener('click', addDraft);
+
+  const batchTest = document.getElementById('batchTest');
+  batchTest.addEventListener('click', () => {
+    batchTest.classList.add('testing');
+    const cards = [...modelList.querySelectorAll('.model-card[data-complete="true"]')];
+    if (!cards.length) flashSave('没有可用模型', true);
+    cards.forEach((card, index) => {
+      setTimeout(() => {
+        testButton(card.querySelector('.test-one'), card);
+        if (index === cards.length - 1) setTimeout(() => batchTest.classList.remove('testing'), 760);
+      }, index * 220);
+    });
+    if (!cards.length) setTimeout(() => batchTest.classList.remove('testing'), 500);
+  });
+
+  const advancedScrim = document.getElementById('advancedScrim');
+  document.getElementById('openAdvanced').addEventListener('click', () => advancedScrim.classList.add('show'));
+  document.getElementById('closeAdvanced').addEventListener('click', () => advancedScrim.classList.remove('show'));
+  advancedScrim.addEventListener('click', event => {
+    if (event.target === advancedScrim) advancedScrim.classList.remove('show');
+  });
+  document.querySelectorAll('.map-row').forEach(row => row.addEventListener('click', () => {
+    row.style.background = '#F0F6FF';
+    flashSave();
+    setTimeout(() => row.style.background = '', 520);
+  }));
+  document.getElementById('groupName').addEventListener('input', () => flashSave());
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') advancedScrim.classList.remove('show');
+  });
+</script>
+</body>
+</html>

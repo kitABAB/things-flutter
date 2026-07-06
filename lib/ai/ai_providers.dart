@@ -6,6 +6,8 @@ import 'config/ai_config.dart';
 import 'config/ai_settings_store.dart';
 import 'config/model_connection.dart';
 import 'core/llm_client.dart';
+import 'core/llm_exception.dart';
+import 'core/llm_message.dart';
 import 'providers/openai_compat_client.dart';
 import 'review/review_service.dart';
 
@@ -27,9 +29,17 @@ class AiSettingsNotifier extends Notifier<AiSettings> {
 
   Future<void> _persist() => AiSettingsStore.save(state);
 
+  Future<void> renameStrategy(String name) async {
+    final trimmed = name.trim();
+    state = state.copyWith(strategyName: trimmed.isEmpty ? '策略组 1' : trimmed);
+    await _persist();
+  }
+
   /// 新增或更新一条连接。首次新增（或显式要求）时设为当前。
-  Future<void> upsertConnection(ModelConnection conn,
-      {bool makeActive = false}) async {
+  Future<void> upsertConnection(
+    ModelConnection conn, {
+    bool makeActive = false,
+  }) async {
     final list = [...state.connections];
     final i = list.indexWhere((e) => e.id == conn.id);
     if (i >= 0) {
@@ -41,13 +51,29 @@ class AiSettingsNotifier extends Notifier<AiSettings> {
     final activatingThis = conn.id == state.activeConnectionId;
     if (makeActive || state.activeConnectionId == null) {
       next = next.copyWith(
-          activeConnectionId: conn.id, activeModel: conn.primaryModel);
-    } else if (activatingThis &&
-        !conn.models.contains(state.activeModel)) {
+        activeConnectionId: conn.id,
+        activeModel: conn.primaryModel,
+      );
+    } else if (activatingThis && !conn.models.contains(state.activeModel)) {
       // 当前连接被编辑后，原模型已不存在则回退到首选模型。
       next = next.copyWith(activeModel: conn.primaryModel);
     }
     state = next;
+    await _persist();
+  }
+
+  Future<void> replaceConnections(List<ModelConnection> connections) async {
+    state = state.copyWith(connections: connections);
+    await _persist();
+  }
+
+  Future<void> reorderConnection(int oldIndex, int newIndex) async {
+    final list = [...state.connections];
+    if (oldIndex < 0 || oldIndex >= list.length) return;
+    final item = list.removeAt(oldIndex);
+    final target = newIndex.clamp(0, list.length);
+    list.insert(target, item);
+    state = state.copyWith(connections: list);
     await _persist();
   }
 
@@ -70,7 +96,9 @@ class AiSettingsNotifier extends Notifier<AiSettings> {
   /// 切换当前使用的连接与模型。
   Future<void> setActive(String connectionId, String model) async {
     state = state.copyWith(
-        activeConnectionId: connectionId, activeModel: model);
+      activeConnectionId: connectionId,
+      activeModel: model,
+    );
     await _persist();
   }
 
@@ -81,18 +109,26 @@ class AiSettingsNotifier extends Notifier<AiSettings> {
   }
 }
 
-final aiSettingsProvider =
-    NotifierProvider<AiSettingsNotifier, AiSettings>(AiSettingsNotifier.new);
+final aiSettingsProvider = NotifierProvider<AiSettingsNotifier, AiSettings>(
+  AiSettingsNotifier.new,
+);
 
 /// 当前生效的运行期配置（由当前连接 + 当前模型派生）。
 /// 业务层与 [llmClientProvider] 仍只依赖这一份扁平配置，多连接对它们透明。
-final aiConfigProvider =
-    Provider<AiConfig>((ref) => ref.watch(aiSettingsProvider).activeConfig);
+final aiConfigProvider = Provider<AiConfig>(
+  (ref) => ref.watch(aiSettingsProvider).activeConfig,
+);
+
+final aiConfigsProvider = Provider<List<AiConfig>>((ref) {
+  final settings = ref.watch(aiSettingsProvider);
+  final configs = settings.activeConfigs;
+  return configs.isEmpty ? [settings.activeConfig] : configs;
+});
 
 /// 厂商无关的对话客户端。所有厂商都走 OpenAI 兼容协议，故统一用一个实现。
 final llmClientProvider = Provider<LlmClient>((ref) {
-  final config = ref.watch(aiConfigProvider);
-  return OpenAiCompatClient(config);
+  final configs = ref.watch(aiConfigsProvider).where((c) => c.isReady).toList();
+  return _FallbackLlmClient(configs);
 });
 
 /// 「一句话拆解捕获」解析器。
@@ -114,3 +150,60 @@ final reviewServiceProvider = Provider<ReviewService>((ref) {
 final aiEnabledProvider = Provider<bool>((ref) {
   return ref.watch(llmClientProvider).isConfigured;
 });
+
+class _FallbackLlmClient implements LlmClient {
+  final List<AiConfig> configs;
+
+  const _FallbackLlmClient(this.configs);
+
+  @override
+  bool get isConfigured => configs.any((c) => c.isReady);
+
+  @override
+  Future<String> complete(
+    List<LlmMessage> messages, {
+    bool jsonMode = false,
+    double temperature = 0.2,
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
+    if (!isConfigured) {
+      throw const LlmException.notConfigured();
+    }
+
+    LlmException? last;
+    for (var i = 0; i < configs.length; i += 1) {
+      final config = configs[i];
+      try {
+        return await OpenAiCompatClient(config).complete(
+          messages,
+          jsonMode: jsonMode,
+          temperature: temperature,
+          timeout: timeout,
+        );
+      } on LlmException catch (e) {
+        last = e;
+        final next = i + 1 < configs.length ? configs[i + 1] : null;
+        if (next == null || !_canTryNext(e, config, next)) rethrow;
+      }
+    }
+    throw last ?? const LlmException.notConfigured();
+  }
+
+  @override
+  Future<List<String>> listModels({
+    Duration timeout = const Duration(seconds: 15),
+  }) {
+    if (!isConfigured) {
+      throw const LlmException.notConfigured();
+    }
+    return OpenAiCompatClient(configs.first).listModels(timeout: timeout);
+  }
+
+  bool _canTryNext(LlmException error, AiConfig current, AiConfig next) {
+    if (error.retryable) return true;
+    if (error.statusCode == 401 || error.statusCode == 403) {
+      return current.apiKey != next.apiKey || current.baseUrl != next.baseUrl;
+    }
+    return false;
+  }
+}

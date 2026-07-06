@@ -1,5 +1,15 @@
 import 'ai_config.dart';
 
+enum ModelConnectionStatus { unknown, ok, failed }
+
+ModelConnectionStatus _parseStatus(Object? value) {
+  final name = value?.toString();
+  return ModelConnectionStatus.values.firstWhere(
+    (e) => e.name == name,
+    orElse: () => ModelConnectionStatus.unknown,
+  );
+}
+
 /// 一个「模型连接」：一把 Key + 一个 OpenAI 兼容端点，可挂多个模型。
 ///
 /// 设计要点：一把 Key 通常支持同厂商的多个模型（如 Gemini 的 flash / pro），
@@ -11,6 +21,8 @@ class ModelConnection {
   final AiProvider provider;
   final String baseUrl;
   final String apiKey;
+  final bool enabled;
+  final ModelConnectionStatus status;
 
   /// 该连接已知的模型 id 列表（手填或从 /models 拉取）。
   final List<String> models;
@@ -21,28 +33,44 @@ class ModelConnection {
     required this.provider,
     required this.baseUrl,
     required this.apiKey,
+    this.enabled = true,
+    this.status = ModelConnectionStatus.unknown,
     this.models = const [],
   });
 
-  bool get isReady => apiKey.trim().isNotEmpty && baseUrl.isNotEmpty;
+  bool get isReady {
+    final model = primaryModel.trim();
+    final uri = Uri.tryParse(baseUrl.trim());
+    final hasEndpoint =
+        uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty &&
+        model.isNotEmpty;
+    if (!enabled || !hasEndpoint) return false;
+    if (provider == AiProvider.custom) return true;
+    return apiKey.trim().isNotEmpty;
+  }
 
   /// 取一个「默认/首选」模型：优先列表第一项，否则回退到厂商预设模型。
-  String get primaryModel =>
-      models.isNotEmpty ? models.first : AiConfig.preset(provider, apiKey: '').model;
+  String get primaryModel => models.isNotEmpty ? models.first : '';
 
   /// 用本连接 + 指定模型拼出一份运行期 [AiConfig]。
   AiConfig configFor(String? model) => AiConfig(
-        provider: provider,
-        baseUrl: baseUrl,
-        model: (model != null && model.trim().isNotEmpty) ? model.trim() : primaryModel,
-        apiKey: apiKey,
-      );
+    provider: provider,
+    baseUrl: baseUrl,
+    model: (model != null && model.trim().isNotEmpty)
+        ? model.trim()
+        : primaryModel,
+    apiKey: apiKey,
+  );
 
   ModelConnection copyWith({
     String? label,
     AiProvider? provider,
     String? baseUrl,
     String? apiKey,
+    bool? enabled,
+    ModelConnectionStatus? status,
     List<String>? models,
   }) {
     return ModelConnection(
@@ -51,18 +79,22 @@ class ModelConnection {
       provider: provider ?? this.provider,
       baseUrl: baseUrl ?? this.baseUrl,
       apiKey: apiKey ?? this.apiKey,
+      enabled: enabled ?? this.enabled,
+      status: status ?? this.status,
       models: models ?? this.models,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'label': label,
-        'provider': provider.name,
-        'baseUrl': baseUrl,
-        'apiKey': apiKey,
-        'models': models,
-      };
+    'id': id,
+    'label': label,
+    'provider': provider.name,
+    'baseUrl': baseUrl,
+    'apiKey': apiKey,
+    'enabled': enabled,
+    'status': status.name,
+    'models': models,
+  };
 
   factory ModelConnection.fromJson(Map<String, dynamic> j) {
     final providerName = j['provider'] as String? ?? AiProvider.gemini.name;
@@ -77,8 +109,10 @@ class ModelConnection {
       ),
       baseUrl: j['baseUrl'] as String? ?? '',
       apiKey: j['apiKey'] as String? ?? '',
-      models: (j['models'] as List?)?.map((e) => e.toString()).toList() ??
-          const [],
+      enabled: j['enabled'] as bool? ?? true,
+      status: _parseStatus(j['status']),
+      models:
+          (j['models'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 
@@ -93,12 +127,15 @@ class ModelConnection {
     final preset = AiConfig.preset(provider, apiKey: apiKey);
     return ModelConnection(
       id: id,
-      label: (label != null && label.trim().isNotEmpty) ? label : provider.label,
+      label: (label != null && label.trim().isNotEmpty)
+          ? label
+          : provider.label,
       provider: provider,
       baseUrl: (baseUrl != null && baseUrl.trim().isNotEmpty)
           ? baseUrl.trim()
           : preset.baseUrl,
       apiKey: apiKey,
+      status: ModelConnectionStatus.unknown,
       models: preset.model.isNotEmpty ? [preset.model] : const [],
     );
   }
@@ -106,58 +143,76 @@ class ModelConnection {
 
 /// AI 的全部可切换设置：一组连接 + 当前选中的连接与模型。
 class AiSettings {
+  final String strategyName;
   final List<ModelConnection> connections;
   final String? activeConnectionId;
   final String? activeModel;
 
   const AiSettings({
+    this.strategyName = '策略组 1',
     this.connections = const [],
     this.activeConnectionId,
     this.activeModel,
   });
 
+  List<ModelConnection> get readyConnections =>
+      connections.where((c) => c.isReady).toList();
+
+  List<AiConfig> get activeConfigs =>
+      readyConnections.map((c) => c.configFor(c.primaryModel)).toList();
+
   ModelConnection? get activeConnection {
+    final ready = readyConnections;
+    if (ready.isNotEmpty) return ready.first;
     if (connections.isEmpty) return null;
-    for (final c in connections) {
-      if (c.id == activeConnectionId) return c;
-    }
     return connections.first;
   }
 
   /// 当前生效的运行期配置；无连接时回退到编译期环境变量（可能为空）。
   AiConfig get activeConfig {
-    final c = activeConnection;
+    final c = readyConnections.isNotEmpty ? readyConnections.first : null;
     if (c == null) return AiConfig.fromEnvironment();
-    return c.configFor(activeModel);
+    return c.configFor(c.primaryModel);
   }
 
   bool get isReady => activeConfig.isReady;
 
   AiSettings copyWith({
+    String? strategyName,
     List<ModelConnection>? connections,
     String? activeConnectionId,
     String? activeModel,
     bool clearActive = false,
   }) {
     return AiSettings(
+      strategyName: strategyName ?? this.strategyName,
       connections: connections ?? this.connections,
-      activeConnectionId:
-          clearActive ? null : (activeConnectionId ?? this.activeConnectionId),
+      activeConnectionId: clearActive
+          ? null
+          : (activeConnectionId ?? this.activeConnectionId),
       activeModel: clearActive ? null : (activeModel ?? this.activeModel),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'connections': connections.map((c) => c.toJson()).toList(),
-        'activeConnectionId': activeConnectionId,
-        'activeModel': activeModel,
-      };
+    'strategyName': strategyName,
+    'connections': connections.map((c) => c.toJson()).toList(),
+    'activeConnectionId': activeConnectionId,
+    'activeModel': activeModel,
+  };
 
   factory AiSettings.fromJson(Map<String, dynamic> j) {
     return AiSettings(
-      connections: (j['connections'] as List?)
-              ?.map((e) =>
-                  ModelConnection.fromJson(Map<String, dynamic>.from(e as Map)))
+      strategyName: (j['strategyName'] as String?)?.trim().isNotEmpty == true
+          ? j['strategyName'] as String
+          : '策略组 1',
+      connections:
+          (j['connections'] as List?)
+              ?.map(
+                (e) => ModelConnection.fromJson(
+                  Map<String, dynamic>.from(e as Map),
+                ),
+              )
               .toList() ??
           const [],
       activeConnectionId: j['activeConnectionId'] as String?,

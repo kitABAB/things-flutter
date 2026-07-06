@@ -1,10 +1,5 @@
 /// 支持的模型厂商。新增厂商只需在这里加一项 + 给一个默认 [AiConfig.preset]。
-enum AiProvider {
-  gemini,
-  openai,
-  deepseek,
-  custom,
-}
+enum AiProvider { gemini, openai, deepseek, custom }
 
 extension AiProviderX on AiProvider {
   String get label {
@@ -41,7 +36,17 @@ class AiConfig {
     required this.apiKey,
   });
 
-  bool get isReady => apiKey.trim().isNotEmpty && baseUrl.isNotEmpty;
+  bool get isReady {
+    final uri = Uri.tryParse(baseUrl.trim());
+    final hasEndpoint =
+        uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty &&
+        model.trim().isNotEmpty;
+    if (!hasEndpoint) return false;
+    if (provider == AiProvider.custom) return true;
+    return apiKey.trim().isNotEmpty;
+  }
 
   AiConfig copyWith({
     AiProvider? provider,
@@ -58,7 +63,11 @@ class AiConfig {
   }
 
   /// 各厂商的默认 baseUrl / 默认模型。apiKey 由调用方补齐。
-  static AiConfig preset(AiProvider provider, {required String apiKey, String? model}) {
+  static AiConfig preset(
+    AiProvider provider, {
+    required String apiKey,
+    String? model,
+  }) {
     switch (provider) {
       case AiProvider.gemini:
         return AiConfig(
@@ -97,8 +106,10 @@ class AiConfig {
   ///   自定义厂商再加：--dart-define=AI_BASE_URL=https://.../v1
   factory AiConfig.fromEnvironment() {
     const key = String.fromEnvironment('AI_API_KEY');
-    const providerName =
-        String.fromEnvironment('AI_PROVIDER', defaultValue: 'gemini');
+    const providerName = String.fromEnvironment(
+      'AI_PROVIDER',
+      defaultValue: 'gemini',
+    );
     const model = String.fromEnvironment('AI_MODEL');
     final provider = AiProvider.values.firstWhere(
       (p) => p.name == providerName,
