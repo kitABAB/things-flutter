@@ -20,11 +20,21 @@ import 'task_detail_screen.dart';
 /// 并在顶部提供轻量的标签过滤器（含从项目/区域继承的标签）。
 class ViewScreen extends ConsumerStatefulWidget {
   final AppView view;
+  final ValueChanged<Item>? onInspectItem;
+  final String? inspectedItemId;
+  final bool desktopMode;
 
   /// 移动端 push 进来时显示返回箭头。
   final bool showBack;
 
-  const ViewScreen({super.key, required this.view, this.showBack = false});
+  const ViewScreen({
+    super.key,
+    required this.view,
+    this.showBack = false,
+    this.onInspectItem,
+    this.inspectedItemId,
+    this.desktopMode = false,
+  });
 
   @override
   ConsumerState<ViewScreen> createState() => _ViewScreenState();
@@ -64,6 +74,10 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
 
   /// 点任务：原地展开 / 收起编辑卡片（不再跳详情页）。
   void _toggleExpand(Item item) {
+    if (widget.onInspectItem != null) {
+      widget.onInspectItem!(item);
+      return;
+    }
     setState(() => _expandedId = _expandedId == item.id ? null : item.id);
   }
 
@@ -73,41 +87,73 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
 
   /// 进入完整详情页（处理检查项 / 重复 / 提醒 / 移动等高级项）。
   void _openTaskDetail(BuildContext context, Item item) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => TaskDetailScreen(initial: item),
-    ));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => TaskDetailScreen(initial: item)));
   }
 
   /// 任务行：展开态渲染原地编辑器，否则渲染普通行。返回的 widget 带有 [ValueKey]。
-  Widget _taskRowKeyed(BuildContext context, Item item,
-      {bool showWhenDate = false}) {
+  Widget _taskRowKeyed(
+    BuildContext context,
+    Item item, {
+    bool showWhenDate = false,
+  }) {
     if (!_selecting && _expandedId == item.id && !item.isProject) {
-      return InlineTaskEditor(
-        key: ValueKey(item.id),
-        item: item,
-        onCollapse: _collapse,
-        onOpenDetail: () {
-          _collapse();
-          _openTaskDetail(context, item);
-        },
+      return _desktopSelectionWrap(
+        InlineTaskEditor(
+          key: ValueKey(item.id),
+          item: item,
+          onCollapse: _collapse,
+          onOpenDetail: () {
+            _collapse();
+            _openTaskDetail(context, item);
+          },
+        ),
+        item,
       );
     }
-    return ItemRow(
-      key: ValueKey(item.id),
-      item: item,
-      showWhenDate: showWhenDate,
-      onTapTask: _toggleExpand,
-      onTapProject: (i) => _openProject(context, i),
-      selectionMode: _selecting,
-      selected: _selected.contains(item.id),
-      onToggleSelect: _toggleSelect,
+    return _desktopSelectionWrap(
+      ItemRow(
+        key: ValueKey(item.id),
+        item: item,
+        showWhenDate: showWhenDate,
+        onTapTask: _toggleExpand,
+        onTapProject: (i) => _openProject(context, i),
+        selectionMode: _selecting,
+        selected: _selected.contains(item.id),
+        onToggleSelect: _toggleSelect,
+      ),
+      item,
+    );
+  }
+
+  Widget _desktopSelectionWrap(Widget child, Item item) {
+    final selected =
+        widget.desktopMode &&
+        !_selecting &&
+        widget.inspectedItemId != null &&
+        widget.inspectedItemId == item.id;
+    if (!selected) return child;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryBlue.withValues(alpha: 0.07),
+        border: const Border(
+          left: BorderSide(color: AppTheme.primaryBlue, width: 3),
+        ),
+      ),
+      child: child,
     );
   }
 
   void _openProject(BuildContext context, Item item) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ProjectScreen(projectId: item.id, projectTitle: item.title),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ProjectScreen(projectId: item.id, projectTitle: item.title),
+      ),
+    );
   }
 
   /// 该视图下「魔法加号」默认新建到哪个时间桶。
@@ -143,7 +189,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     final links = ref.watch(effectiveItemTagLinksProvider).value ?? const {};
 
     return Scaffold(
+      backgroundColor: widget.desktopMode ? Colors.transparent : null,
       body: SafeArea(
+        top: !widget.desktopMode,
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('出错了：$e')),
@@ -152,21 +200,26 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
             for (final it in rawItems) {
               presentTagIds.addAll(links[it.id] ?? const <String>{});
             }
-            final presentTags =
-                allTags.where((t) => presentTagIds.contains(t.id)).toList();
+            final presentTags = allTags
+                .where((t) => presentTagIds.contains(t.id))
+                .toList();
 
             final activeFilter =
                 (_tagFilter != null && presentTagIds.contains(_tagFilter))
-                    ? _tagFilter
-                    : null;
+                ? _tagFilter
+                : null;
             final items = activeFilter == null
                 ? rawItems
                 : rawItems
-                    .where((it) =>
-                        (links[it.id] ?? const <String>{}).contains(activeFilter))
-                    .toList();
+                      .where(
+                        (it) => (links[it.id] ?? const <String>{}).contains(
+                          activeFilter,
+                        ),
+                      )
+                      .toList();
 
             return Scaffold(
+              backgroundColor: widget.desktopMode ? Colors.transparent : null,
               bottomNavigationBar: _selecting ? _selectionBar(context) : null,
               body: CustomScrollView(
                 slivers: [
@@ -202,17 +255,22 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon,
+                Icon(
+                  icon,
+                  color: _selected.isEmpty
+                      ? AppTheme.textSecondary
+                      : AppTheme.primaryBlue,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
                     color: _selected.isEmpty
                         ? AppTheme.textSecondary
-                        : AppTheme.primaryBlue),
-                const SizedBox(height: 2),
-                Text(label,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: _selected.isEmpty
-                            ? AppTheme.textSecondary
-                            : AppTheme.primaryBlue)),
+                        : AppTheme.primaryBlue,
+                  ),
+                ),
               ],
             ),
           ),
@@ -227,18 +285,28 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
         ),
         child: Row(
           children: [
-            action(Icons.check_circle_outline, '完成',
-                () => _batch((id) => repo.toggleComplete(id, true))),
+            action(
+              Icons.check_circle_outline,
+              '完成',
+              () => _batch((id) => repo.toggleComplete(id, true)),
+            ),
             action(Icons.calendar_today_rounded, '计划', () async {
               final choice = await WhenPickerSheet.showChoice(context);
               if (choice == null) return;
-              await _batch((id) => repo.setWhen(id,
+              await _batch(
+                (id) => repo.setWhen(
+                  id,
                   start: choice.start,
                   startDate: choice.startDate,
-                  evening: choice.evening));
+                  evening: choice.evening,
+                ),
+              );
             }),
-            action(Icons.delete_outline, '删除',
-                () => _batch((id) => repo.moveToTrash(id))),
+            action(
+              Icons.delete_outline,
+              '删除',
+              () => _batch((id) => repo.moveToTrash(id)),
+            ),
           ],
         ),
       ),
@@ -249,7 +317,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   Widget _buildUpcoming(BuildContext context) {
     final async = ref.watch(upcomingEntriesProvider);
     return Scaffold(
+      backgroundColor: widget.desktopMode ? Colors.transparent : null,
       body: SafeArea(
+        top: !widget.desktopMode,
         child: async.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('出错了：$e')),
@@ -270,7 +340,8 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
               labels[key] = DateFmt.groupLabel(d);
               dates[key] = DateTime(d.year, d.month, d.day);
             }
-            final calEvents = ref.watch(upcomingCalendarProvider).value ?? const [];
+            final calEvents =
+                ref.watch(upcomingCalendarProvider).value ?? const [];
             final eventGroups = <String, List<CalEvent>>{};
             for (final ev in calEvents) {
               final d = ev.start;
@@ -283,17 +354,25 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
               ..sort((a, b) => dates[a]!.compareTo(dates[b]!));
             final slivers = <Widget>[_header(context)];
             for (final key in allKeys) {
-              slivers.add(SliverToBoxAdapter(
+              slivers.add(
+                SliverToBoxAdapter(
                   child: _upcomingGroupHeader(
-                      context, labels[key]!, dates[key]!)));
+                    context,
+                    labels[key]!,
+                    dates[key]!,
+                  ),
+                ),
+              );
               final evs = eventGroups[key];
               if (evs != null) {
-                slivers.add(SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _calendarEventTile(context, evs[i]),
-                    childCount: evs.length,
+                slivers.add(
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => _calendarEventTile(context, evs[i]),
+                      childCount: evs.length,
+                    ),
                   ),
-                ));
+                );
               }
               final ents = groups[key];
               if (ents != null) slivers.add(_entryList(context, ents));
@@ -307,7 +386,11 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   }
 
   /// 计划视图的日期分组头：兼作拖拽改期的放置目标。
-  Widget _upcomingGroupHeader(BuildContext context, String label, DateTime date) {
+  Widget _upcomingGroupHeader(
+    BuildContext context,
+    String label,
+    DateTime date,
+  ) {
     final repo = ref.read(itemRepositoryProvider);
     return DragTarget<String>(
       onWillAcceptWithDetails: (_) => true,
@@ -334,76 +417,77 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final e = entries[index];
-            // 展开态：原地编辑器（仅对真实可编辑的计划条目）。
-            if (!_selecting &&
-                !e.isShadow &&
-                !e.isDeadline &&
-                !e.item.isProject &&
-                _expandedId == e.item.id) {
-              return _taskRowKeyed(context, e.item);
-            }
-            final row = ItemRow(
-              item: e.item,
-              deadlineShadow: e.isDeadline,
-              onTapTask: _toggleExpand,
-              onTapProject: (i) => _openProject(context, i),
-            );
-            // 真实的「计划」条目可长按拖到别的日期分组改期。
-            final draggable = !e.isShadow && !e.isDeadline;
-            if (draggable) {
-              return LongPressDraggable<String>(
-                data: e.item.id,
-                feedback: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width - 32,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.18),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4)),
-                      ],
-                    ),
-                    child: row,
-                  ),
-                ),
-                childWhenDragging: Opacity(opacity: 0.3, child: row),
-                child: row
-                    .animate()
-                    .fadeIn(duration: 220.ms, delay: (index * 18).ms)
-                    .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
-              );
-            }
-            if (e.isShadow) {
-              // 重复任务的未来影子：半透明、不可交互、带循环图标。
-              return IgnorePointer(
-                child: Opacity(
-                  opacity: 0.45,
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 12),
-                      Icon(Icons.repeat_rounded,
-                          size: 16, color: AppTheme.textSecondary),
-                      Expanded(child: row),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final e = entries[index];
+          // 展开态：原地编辑器（仅对真实可编辑的计划条目）。
+          if (!_selecting &&
+              !e.isShadow &&
+              !e.isDeadline &&
+              !e.item.isProject &&
+              _expandedId == e.item.id) {
+            return _taskRowKeyed(context, e.item);
+          }
+          final row = ItemRow(
+            item: e.item,
+            deadlineShadow: e.isDeadline,
+            onTapTask: _toggleExpand,
+            onTapProject: (i) => _openProject(context, i),
+          );
+          // 真实的「计划」条目可长按拖到别的日期分组改期。
+          final draggable = !e.isShadow && !e.isDeadline;
+          if (draggable) {
+            return LongPressDraggable<String>(
+              data: e.item.id,
+              feedback: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: MediaQuery.of(context).size.width - 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
                     ],
                   ),
+                  child: row,
                 ),
-              ).animate().fadeIn(duration: 220.ms, delay: (index * 18).ms);
-            }
-            return row
-                .animate()
-                .fadeIn(duration: 220.ms, delay: (index * 18).ms)
-                .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic);
-          },
-          childCount: entries.length,
-        ),
+              ),
+              childWhenDragging: Opacity(opacity: 0.3, child: row),
+              child: row
+                  .animate()
+                  .fadeIn(duration: 220.ms, delay: (index * 18).ms)
+                  .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+            );
+          }
+          if (e.isShadow) {
+            // 重复任务的未来影子：半透明、不可交互、带循环图标。
+            return IgnorePointer(
+              child: Opacity(
+                opacity: 0.45,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.repeat_rounded,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
+                    Expanded(child: row),
+                  ],
+                ),
+              ),
+            ).animate().fadeIn(duration: 220.ms, delay: (index * 18).ms);
+          }
+          return row
+              .animate()
+              .fadeIn(duration: 220.ms, delay: (index * 18).ms)
+              .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic);
+        }, childCount: entries.length),
       ),
     );
   }
@@ -427,14 +511,17 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                  _selecting ? '已选 ${_selected.length} 项' : view.title,
-                  style: Theme.of(context).textTheme.titleLarge),
+                _selecting ? '已选 ${_selected.length} 项' : view.title,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
             if (canSelect && !_selecting)
               IconButton(
                 tooltip: '多选',
-                icon: Icon(Icons.checklist_rounded,
-                    color: AppTheme.textSecondary),
+                icon: Icon(
+                  Icons.checklist_rounded,
+                  color: AppTheme.textSecondary,
+                ),
                 onPressed: () => setState(() => _selecting = true),
               ),
             if (_selecting)
@@ -483,19 +570,25 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
                 .animate()
                 .fadeIn(duration: 500.ms)
                 .scaleXY(
-                    begin: 0.9,
-                    end: 1,
-                    curve: Curves.easeOutBack,
-                    duration: 600.ms),
+                  begin: 0.9,
+                  end: 1,
+                  curve: Curves.easeOutBack,
+                  duration: 600.ms,
+                ),
             const SizedBox(height: 22),
-            Text(view.title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.w700)),
+            Text(
+              view.title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(view.emptyHint,
-                style: Theme.of(context).textTheme.bodyMedium,
-                textAlign: TextAlign.center),
+            Text(
+              view.emptyHint,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
           ],
         ).animate().fadeIn(duration: 400.ms),
       ),
@@ -507,9 +600,11 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
       hasScrollBody: false,
       child: Padding(
         padding: const EdgeInsets.only(top: 60.0),
-        child: Text('该标签下没有任务',
-            style: Theme.of(context).textTheme.bodyMedium,
-            textAlign: TextAlign.center),
+        child: Text(
+          '该标签下没有任务',
+          style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
@@ -519,7 +614,12 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
       case AppView.today:
         return _todayBody(context, items);
       case AppView.logbook:
-        return _groupedByDate(context, items, (i) => i.completedAt, DateFmt.logLabel);
+        return _groupedByDate(
+          context,
+          items,
+          (i) => i.completedAt,
+          DateFmt.logLabel,
+        );
       case AppView.inbox:
       case AppView.anytime:
       case AppView.someday:
@@ -530,8 +630,11 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     }
   }
 
-  Widget _reorderableList(BuildContext context, List<Item> items,
-      {bool todayOrder = false}) {
+  Widget _reorderableList(
+    BuildContext context,
+    List<Item> items, {
+    bool todayOrder = false,
+  }) {
     final repo = ref.read(itemRepositoryProvider);
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -541,23 +644,31 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
           final reordered = [...items];
           final moved = reordered.removeAt(oldIndex);
           reordered.insert(newIndex, moved);
-          repo.reorder(reordered.map((e) => e.id).toList(),
-              todayOrder: todayOrder);
+          repo.reorder(
+            reordered.map((e) => e.id).toList(),
+            todayOrder: todayOrder,
+          );
         },
         itemBuilder: (context, index) {
           final it = items[index];
           if (!_selecting && _expandedId == it.id && !it.isProject) {
-            return _taskRowKeyed(context, it,
-                showWhenDate: view == AppView.anytime);
+            return _taskRowKeyed(
+              context,
+              it,
+              showWhenDate: view == AppView.anytime,
+            );
           }
           return ReorderableDelayedDragStartListener(
             key: ValueKey(it.id),
             index: index,
-            child: ItemRow(
-              item: it,
-              showWhenDate: view == AppView.anytime,
-              onTapTask: _toggleExpand,
-              onTapProject: (i) => _openProject(context, i),
+            child: _desktopSelectionWrap(
+              ItemRow(
+                item: it,
+                showWhenDate: view == AppView.anytime,
+                onTapTask: _toggleExpand,
+                onTapProject: (i) => _openProject(context, i),
+              ),
+              it,
             ),
           );
         },
@@ -585,16 +696,19 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
           Icon(Icons.event_rounded, size: 16, color: AppTheme.primaryBlue),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(e.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyLarge),
+            child: Text(
+              e.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
           ),
-          Text(timeLabel,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.textSecondary)),
+          Text(
+            timeLabel,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
+          ),
         ],
       ),
     );
@@ -643,7 +757,10 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   /// 今天专用的合并可重排列表：[白天...] + [今晚分隔线] + [今晚...]。
   /// 分隔线占一个槽位但不可拖动，仅作为「白天 / 今晚」的分界参照。
   Widget _todayReorderable(
-      BuildContext context, List<Item> day, List<Item> evening) {
+    BuildContext context,
+    List<Item> day,
+    List<Item> evening,
+  ) {
     final dividerIndex = day.length;
     final total = day.length + 1 + evening.length;
     return SliverPadding(
@@ -668,10 +785,13 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
           return ReorderableDelayedDragStartListener(
             key: ValueKey(it.id),
             index: index,
-            child: ItemRow(
-              item: it,
-              onTapTask: _toggleExpand,
-              onTapProject: (i) => _openProject(context, i),
+            child: _desktopSelectionWrap(
+              ItemRow(
+                item: it,
+                onTapTask: _toggleExpand,
+                onTapProject: (i) => _openProject(context, i),
+              ),
+              it,
             ),
           );
         },
@@ -682,7 +802,11 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   /// 处理今天合并列表的拖拽落点：按相对分隔线的位置切换 evening，
   /// 并分别持久化「白天 / 今晚」两段的 today_sort_order。
   void _reorderToday(
-      List<Item> day, List<Item> evening, int oldIndex, int newIndex) {
+    List<Item> day,
+    List<Item> evening,
+    int oldIndex,
+    int newIndex,
+  ) {
     final repo = ref.read(itemRepositoryProvider);
     const divider = '\u0000evening-divider';
     final slots = <String>[
@@ -714,8 +838,10 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   Widget _eveningHint(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 16, 8),
-      child: Text('把任务的「计划」设为今晚，它会出现在这里',
-          style: Theme.of(context).textTheme.bodyMedium),
+      child: Text(
+        '把任务的「计划」设为今晚，它会出现在这里',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
     );
   }
 
@@ -724,11 +850,19 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
       child: Row(
         children: [
-          const Icon(Icons.nightlight_round, size: 16, color: AppTheme.eveningIndigo),
+          const Icon(
+            Icons.nightlight_round,
+            size: 16,
+            color: AppTheme.eveningIndigo,
+          ),
           const SizedBox(width: 8),
-          Text('今晚',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.eveningIndigo, fontWeight: FontWeight.w600)),
+          Text(
+            '今晚',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.eveningIndigo,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(width: 12),
           const Expanded(child: Divider()),
         ],
@@ -753,7 +887,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     }
     final slivers = <Widget>[];
     for (final entry in groups.entries) {
-      slivers.add(SliverToBoxAdapter(child: _groupHeader(context, labels[entry.key]!)));
+      slivers.add(
+        SliverToBoxAdapter(child: _groupHeader(context, labels[entry.key]!)),
+      );
       slivers.add(_flatList(context, entry.value));
     }
     return slivers;
@@ -762,9 +898,13 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   Widget _groupHeader(BuildContext context, String label) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 2),
-      child: Text(label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppTheme.textPrimary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 
@@ -772,19 +912,19 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final it = items[index];
-            final row = _taskRowKeyed(context, it,
-                showWhenDate: view == AppView.anytime);
-            if (_selecting || _expandedId == it.id) return row;
-            return row
-                .animate()
-                .fadeIn(duration: 200.ms, delay: (index * 16).ms)
-                .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic);
-          },
-          childCount: items.length,
-        ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final it = items[index];
+          final row = _taskRowKeyed(
+            context,
+            it,
+            showWhenDate: view == AppView.anytime,
+          );
+          if (_selecting || _expandedId == it.id) return row;
+          return row
+              .animate()
+              .fadeIn(duration: 200.ms, delay: (index * 16).ms)
+              .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic);
+        }, childCount: items.length),
       ),
     );
   }

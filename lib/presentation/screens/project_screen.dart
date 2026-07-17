@@ -18,22 +18,35 @@ import 'task_detail_screen.dart';
 class ProjectScreen extends ConsumerWidget {
   final String projectId;
   final String projectTitle;
+  final ValueChanged<Item>? onInspectItem;
+  final String? inspectedItemId;
+  final bool desktopMode;
 
   const ProjectScreen({
     super.key,
     required this.projectId,
     required this.projectTitle,
+    this.onInspectItem,
+    this.inspectedItemId,
+    this.desktopMode = false,
   });
 
   void _openTask(BuildContext context, Item i) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => TaskDetailScreen(initial: i),
-    ));
+    if (onInspectItem != null) {
+      onInspectItem!(i);
+      return;
+    }
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => TaskDetailScreen(initial: i)));
   }
 
   Future<void> _addHeading(BuildContext context, WidgetRef ref) async {
-    final name =
-        await NameDialog.show(context, title: '新建标题', hint: '标题名称（如：前端 UI）');
+    final name = await NameDialog.show(
+      context,
+      title: '新建标题',
+      hint: '标题名称（如：前端 UI）',
+    );
     if (name != null && name.isNotEmpty) {
       await ref
           .read(itemRepositoryProvider)
@@ -50,67 +63,83 @@ class ProjectScreen extends ConsumerWidget {
     return MagicCreateScope(
       context: MagicCreateContext(projectId: projectId),
       child: Scaffold(
-      body: SafeArea(
-        child: itemsAsync.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('出错了：$e')),
-          data: (items) {
-            final headings = items.where((i) => i.isHeading).toList();
-            final looseTasks =
-                items.where((i) => i.isTask && i.headingId == null).toList();
+        backgroundColor: desktopMode ? Colors.transparent : null,
+        body: SafeArea(
+          top: !desktopMode,
+          child: itemsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('出错了：$e')),
+            data: (items) {
+              final headings = items.where((i) => i.isHeading).toList();
+              final looseTasks = items
+                  .where((i) => i.isTask && i.headingId == null)
+                  .toList();
 
-            return CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-                          color: AppTheme.textSecondary,
-                          onPressed: () => Navigator.of(context).maybePop(),
-                        ),
-                        ProgressPie(
-                          progress: progress.maybeWhen(
-                              data: (p) => p.fraction, orElse: () => 0.0),
-                          size: 24,
-                          color: AppTheme.primaryBlue,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(projectTitle,
-                              style: Theme.of(context).textTheme.titleLarge),
-                        ),
-                        IconButton(
-                          tooltip: '新建标题',
-                          icon: Icon(Icons.segment_rounded,
-                              color: AppTheme.textSecondary),
-                          onPressed: () => _addHeading(context, ref),
-                        ),
-                        _projectMenu(context, ref, repo),
-                      ],
+              return CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    sliver: SliverToBoxAdapter(
+                      child: Row(
+                        children: [
+                          if (!desktopMode)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_ios_new,
+                                size: 18,
+                              ),
+                              color: AppTheme.textSecondary,
+                              onPressed: () => Navigator.of(context).maybePop(),
+                            ),
+                          ProgressPie(
+                            progress: progress.maybeWhen(
+                              data: (p) => p.fraction,
+                              orElse: () => 0.0,
+                            ),
+                            size: 24,
+                            color: AppTheme.primaryBlue,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              projectTitle,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '新建标题',
+                            icon: Icon(
+                              Icons.segment_rounded,
+                              color: AppTheme.textSecondary,
+                            ),
+                            onPressed: () => _addHeading(context, ref),
+                          ),
+                          _projectMenu(context, ref, repo),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SliverToBoxAdapter(child: _projectMeta(context, ref, repo)),
-                _reorderableTasks(context, repo, looseTasks),
-                for (final h in headings) ...[
-                  SliverToBoxAdapter(
-                      child: _headingTile(context, repo, h, headings)),
-                  _reorderableTasks(
-                    context,
-                    repo,
-                    items.where((i) => i.isTask && i.headingId == h.id).toList(),
-                  ),
+                  SliverToBoxAdapter(child: _projectMeta(context, ref, repo)),
+                  _reorderableTasks(context, repo, looseTasks),
+                  for (final h in headings) ...[
+                    SliverToBoxAdapter(
+                      child: _headingTile(context, repo, h, headings),
+                    ),
+                    _reorderableTasks(
+                      context,
+                      repo,
+                      items
+                          .where((i) => i.isTask && i.headingId == h.id)
+                          .toList(),
+                    ),
+                  ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 96)),
                 ],
-                const SliverToBoxAdapter(child: SizedBox(height: 96)),
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -162,12 +191,22 @@ class ProjectScreen extends ConsumerWidget {
     if (project.start == WhenStart.someday) {
       chips.add(_metaChip(Icons.archive_rounded, '将来', AppTheme.somedayGrey));
     } else if (project.startDate != null) {
-      chips.add(_metaChip(Icons.calendar_today_rounded,
-          DateFmt.groupLabel(project.startDate!), AppTheme.todayYellow));
+      chips.add(
+        _metaChip(
+          Icons.calendar_today_rounded,
+          DateFmt.groupLabel(project.startDate!),
+          AppTheme.todayYellow,
+        ),
+      );
     }
     if (project.deadline != null) {
-      chips.add(_metaChip(Icons.flag_rounded,
-          DateFmt.deadlineLabel(project.deadline!), AppTheme.deadlineRed));
+      chips.add(
+        _metaChip(
+          Icons.flag_rounded,
+          DateFmt.deadlineLabel(project.deadline!),
+          AppTheme.deadlineRed,
+        ),
+      );
     }
     if (chips.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -182,15 +221,24 @@ class ProjectScreen extends ConsumerWidget {
       children: [
         Icon(icon, size: 13, color: color),
         const SizedBox(width: 4),
-        Text(label,
-            style: TextStyle(
-                fontSize: 13, color: color, fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ],
     );
   }
 
   Widget _headingTile(
-      BuildContext context, repo, Item heading, List<Item> headings) {
+    BuildContext context,
+    repo,
+    Item heading,
+    List<Item> headings,
+  ) {
     final tile = Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
       child: Column(
@@ -198,22 +246,29 @@ class ProjectScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.drag_indicator_rounded,
-                  size: 18, color: AppTheme.dividerColor),
+              Icon(
+                Icons.drag_indicator_rounded,
+                size: 18,
+                color: AppTheme.dividerColor,
+              ),
               const SizedBox(width: 4),
               Expanded(
-                child: Text(heading.title,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700)),
+                child: Text(
+                  heading.title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               PopupMenuButton<String>(
                 icon: Icon(Icons.more_horiz, color: AppTheme.textSecondary),
                 onSelected: (v) {
                   if (v == 'add') {
-                    AddEditItemModal.show(context,
-                        projectId: projectId, headingId: heading.id);
+                    AddEditItemModal.pushCreate(
+                      context,
+                      projectId: projectId,
+                      headingId: heading.id,
+                    );
                   }
                   if (v == 'archive') repo.setHeadingArchived(heading.id, true);
                   if (v == 'trash') repo.moveToTrash(heading.id);
@@ -256,9 +311,10 @@ class ProjectScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(10),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4)),
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: tile,
@@ -296,10 +352,30 @@ class ProjectScreen extends ConsumerWidget {
           return ReorderableDelayedDragStartListener(
             key: ValueKey(task.id),
             index: index,
-            child: ItemRow(item: task, onTapTask: (i) => _openTask(context, i)),
+            child: _desktopSelectionWrap(
+              ItemRow(item: task, onTapTask: (i) => _openTask(context, i)),
+              task,
+            ),
           );
         },
       ),
+    );
+  }
+
+  Widget _desktopSelectionWrap(Widget child, Item item) {
+    final selected =
+        desktopMode && inspectedItemId != null && inspectedItemId == item.id;
+    if (!selected) return child;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: AppTheme.primaryBlue.withValues(alpha: 0.07),
+        border: const Border(
+          left: BorderSide(color: AppTheme.primaryBlue, width: 3),
+        ),
+      ),
+      child: child,
     );
   }
 }

@@ -11,12 +11,13 @@ import '../../../domain/models/item.dart';
 import '../../providers/item_providers.dart';
 import '../theme/app_theme.dart';
 import 'clarify_card.dart';
+import 'smooth_dialog.dart';
 
 /// 单条「AI 理清」面板：对一条既有条目追问澄清并整理成可执行草稿，
 /// 用户确认后**原地更新**该条目。
 class ClarifySheet {
   static Future<bool?> show(BuildContext context, Item item) {
-    return showDialog<bool>(
+    return showSmoothDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _ClarifyBody(item: item),
@@ -61,14 +62,15 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
   }
 
   CaptureContext _ctx() => CaptureContext(
-        now: DateTime.now(),
-        projectNames:
-            (ref.read(projectsProvider).value ?? []).map((e) => e.title).toList(),
-        areaNames:
-            (ref.read(areasProvider).value ?? []).map((e) => e.title).toList(),
-        tagNames:
-            (ref.read(tagsProvider).value ?? []).map((e) => e.title).toList(),
-      );
+    now: DateTime.now(),
+    projectNames: (ref.read(projectsProvider).value ?? [])
+        .map((e) => e.title)
+        .toList(),
+    areaNames: (ref.read(areasProvider).value ?? [])
+        .map((e) => e.title)
+        .toList(),
+    tagNames: (ref.read(tagsProvider).value ?? []).map((e) => e.title).toList(),
+  );
 
   Future<void> _run(List<ClarifyAnswer> answers) async {
     setState(() {
@@ -78,7 +80,11 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
     final service = ref.read(clarifyServiceProvider);
     ClarifyResult result;
     try {
-      result = await service.clarify(widget.item.title, _ctx(), answers: answers);
+      result = await service.clarify(
+        widget.item.title,
+        _ctx(),
+        answers: answers,
+      );
     } on LlmException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -141,8 +147,9 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _applying = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('应用失败：$e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('应用失败：$e')));
       return;
     }
     if (!mounted) return;
@@ -172,12 +179,16 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
               padding: const EdgeInsets.fromLTRB(22, 18, 14, 6),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded,
-                      size: 18, color: AppTheme.primaryBlue),
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 18,
+                    color: AppTheme.primaryBlue,
+                  ),
                   const SizedBox(width: 8),
-                  const Text('AI 理清',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
+                  const Text(
+                    'AI 理清',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 20),
@@ -194,7 +205,10 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
+                  fontSize: 12.5,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
               ),
             ),
             const Divider(height: 16),
@@ -218,11 +232,15 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
                   width: 26,
                   height: 26,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2.4, color: AppTheme.primaryBlue),
+                    strokeWidth: 2.4,
+                    color: AppTheme.primaryBlue,
+                  ),
                 ),
                 const SizedBox(height: 14),
-                Text('AI 正在理清…',
-                    style: TextStyle(color: AppTheme.textSecondary)),
+                Text(
+                  'AI 正在理清…',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
               ],
             ),
           ),
@@ -233,13 +251,16 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(_error ?? '出错了',
-                  style: const TextStyle(color: AppTheme.deadlineRed)),
+              Text(
+                _error ?? '出错了',
+                style: const TextStyle(color: AppTheme.deadlineRed),
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: () => _run(const []),
                 style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.primaryBlue),
+                  backgroundColor: AppTheme.primaryBlue,
+                ),
                 child: const Text('重试'),
               ),
             ],
@@ -266,11 +287,14 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
               if (_result!.note != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(_result!.note!,
-                      style: TextStyle(
-                          fontSize: 13,
-                          height: 1.4,
-                          color: AppTheme.textSecondary)),
+                  child: Text(
+                    _result!.note!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
                 ),
               for (var i = 0; i < qs.length; i++) _questionBlock(i, qs[i]),
             ],
@@ -304,9 +328,14 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(q.question,
-              style: const TextStyle(
-                  fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.4)),
+          Text(
+            q.question,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
           const SizedBox(height: 8),
           if (q.options.isNotEmpty)
             Wrap(
@@ -334,8 +363,10 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide.none,
               ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
             ),
             onChanged: (v) {
               if (v.trim().isNotEmpty && _picked[i] != null) {
@@ -360,11 +391,14 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
               : AppTheme.primaryBlue.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : AppTheme.primaryBlue)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppTheme.primaryBlue,
+          ),
+        ),
       ),
     );
   }
@@ -408,7 +442,9 @@ class _ClarifyBodyState extends ConsumerState<_ClarifyBody> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text('应用'),
               ),

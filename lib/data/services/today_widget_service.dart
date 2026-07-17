@@ -19,6 +19,7 @@ import '../database/schema.dart';
 class TodayWidgetService {
   TodayWidgetService._();
   static final instance = TodayWidgetService._();
+  static bool get _supportsHomeWidget => Platform.isAndroid || Platform.isIOS;
 
   static const _qualifiedName =
       'com.clone.things3.things3_clone.TodayWidgetProvider';
@@ -41,13 +42,17 @@ class TodayWidgetService {
 
   /// 在 main() 里调用一次：注册后台交互回调。
   Future<void> init() async {
+    if (!_supportsHomeWidget) return;
     if (_registered) return;
     _registered = true;
-    await HomeWidget.registerInteractivityCallback(todayWidgetBackgroundCallback);
+    await HomeWidget.registerInteractivityCallback(
+      todayWidgetBackgroundCallback,
+    );
   }
 
   /// 主 isolate：用全局 db 重算并推送（「今天」列表一变就调）。
   Future<void> refresh() async {
+    if (!_supportsHomeWidget) return;
     await _buildAndWrite(db);
   }
 
@@ -57,7 +62,8 @@ class TodayWidgetService {
 
   static Future<void> _buildAndWrite(PowerSyncDatabase database) async {
     // 1) 读当前筛选 / 展开状态
-    final expanded = (await HomeWidget.getWidgetData<String>('expanded')) == '1';
+    final expanded =
+        (await HomeWidget.getWidgetData<String>('expanded')) == '1';
     final activeTagPref =
         (await HomeWidget.getWidgetData<String>('active_tag')) ?? '';
 
@@ -98,8 +104,8 @@ class TodayWidgetService {
     final filtered = active.isEmpty
         ? today
         : today
-            .where((r) => (links[r.id] ?? const <String>{}).contains(active))
-            .toList();
+              .where((r) => (links[r.id] ?? const <String>{}).contains(active))
+              .toList();
 
     // 5) 今日完成度（进度环）：今日已完成数 / (今日已完成 + 今日开放)
     final doneRows = await database.getAll('''
@@ -170,7 +176,9 @@ class TodayWidgetService {
       final id = i < chips.length ? chips[i] : '';
       await HomeWidget.saveWidgetData<String>('chip${i}_id', id);
       await HomeWidget.saveWidgetData<String>(
-          'chip${i}_title', id.isEmpty ? '' : (chipTitle[id] ?? ''));
+        'chip${i}_title',
+        id.isEmpty ? '' : (chipTitle[id] ?? ''),
+      );
     }
 
     await HomeWidget.updateWidget(qualifiedAndroidName: _qualifiedName);
@@ -205,12 +213,14 @@ class TodayWidgetService {
           }
           break;
         case 'togglefilter':
-          final cur = (await HomeWidget.getWidgetData<String>('expanded')) == '1';
+          final cur =
+              (await HomeWidget.getWidgetData<String>('expanded')) == '1';
           await HomeWidget.saveWidgetData<String>('expanded', cur ? '0' : '1');
           break;
         case 'filter':
           final tag = uri.queryParameters['tag'] ?? '';
-          final cur = (await HomeWidget.getWidgetData<String>('active_tag')) ?? '';
+          final cur =
+              (await HomeWidget.getWidgetData<String>('active_tag')) ?? '';
           // 点已选中的、或空 tag（「全部」/✕）→ 清除；否则设为该标签并保持展开。
           final next = (tag.isEmpty || tag == cur) ? '' : tag;
           await HomeWidget.saveWidgetData<String>('active_tag', next);
@@ -228,12 +238,16 @@ class TodayWidgetService {
   }
 
   /// 在后台 isolate 直接插入一条收件箱任务（字段默认值与 ItemRepository.createTask 对齐）。
-  static Future<void> _insertInbox(PowerSyncDatabase database, String title) async {
+  static Future<void> _insertInbox(
+    PowerSyncDatabase database,
+    String title,
+  ) async {
     final id = const Uuid().v4();
     final now = DateTime.now();
     final nowIso = now.toIso8601String();
     final order = now.millisecondsSinceEpoch;
-    await database.execute('''
+    await database.execute(
+      '''
       INSERT INTO items
         (id, user_id, type, title, status, completed_at, trashed,
          start, start_date, evening, deadline,
@@ -245,7 +259,9 @@ class TodayWidgetService {
               'none', 1, NULL, 0,
               NULL, NULL, NULL, ?, ?,
               ?, ?)
-    ''', [id, _userId, title, order, order, nowIso, nowIso]);
+    ''',
+      [id, _userId, title, order, order, nowIso, nowIso],
+    );
   }
 
   /// 在后台 isolate 打开同一个本地 PowerSync 库（离线，不连云）。
@@ -298,11 +314,16 @@ class _TodayRow {
 
   factory _TodayRow.fromRow(Map<String, dynamic> r) {
     final deadlineStr = r['deadline'] as String?;
-    DateTime? deadline =
-        (deadlineStr == null || deadlineStr.isEmpty) ? null : DateTime.tryParse(deadlineStr);
-    final flag = deadline != null &&
-        DateTime(deadline.year, deadline.month, deadline.day)
-            .isBefore(DateTime.now().add(const Duration(days: 3)));
+    DateTime? deadline = (deadlineStr == null || deadlineStr.isEmpty)
+        ? null
+        : DateTime.tryParse(deadlineStr);
+    final flag =
+        deadline != null &&
+        DateTime(
+          deadline.year,
+          deadline.month,
+          deadline.day,
+        ).isBefore(DateTime.now().add(const Duration(days: 3)));
     return _TodayRow(
       r['id'] as String,
       (r['title'] as String?) ?? '',

@@ -10,7 +10,14 @@ class MagicCreateContext {
   final String? projectId;
   final String? headingId;
   final WhenChoice? defaultWhen;
-  const MagicCreateContext({this.projectId, this.headingId, this.defaultWhen});
+  final bool hidePlus;
+
+  const MagicCreateContext({
+    this.projectId,
+    this.headingId,
+    this.defaultWhen,
+    this.hidePlus = false,
+  });
 }
 
 /// 全局唯一的「当前新建语境」控制器：用一个栈跟踪随导航变化的语境。
@@ -19,8 +26,9 @@ class MagicPlusController {
   MagicPlusController._();
   static final MagicPlusController instance = MagicPlusController._();
 
-  final ValueNotifier<MagicCreateContext> active =
-      ValueNotifier(const MagicCreateContext());
+  final ValueNotifier<MagicCreateContext> active = ValueNotifier(
+    const MagicCreateContext(),
+  );
   final List<(int, MagicCreateContext)> _stack = [];
   int _seq = 0;
 
@@ -45,8 +53,21 @@ class MagicPlusController {
   }
 
   void _emit() {
-    active.value =
-        _stack.isEmpty ? const MagicCreateContext() : _stack.last.$2;
+    if (_stack.isEmpty) {
+      active.value = const MagicCreateContext();
+      return;
+    }
+
+    final current = _stack.last.$2;
+    final hidePlus = _stack.any((entry) => entry.$2.hidePlus);
+    active.value = hidePlus
+        ? MagicCreateContext(
+            projectId: current.projectId,
+            headingId: current.headingId,
+            defaultWhen: current.defaultWhen,
+            hidePlus: true,
+          )
+        : current;
   }
 }
 
@@ -54,8 +75,11 @@ class MagicPlusController {
 class MagicCreateScope extends StatefulWidget {
   final MagicCreateContext context;
   final Widget child;
-  const MagicCreateScope(
-      {super.key, required this.context, required this.child});
+  const MagicCreateScope({
+    super.key,
+    required this.context,
+    required this.child,
+  });
 
   @override
   State<MagicCreateScope> createState() => _MagicCreateScopeState();
@@ -82,32 +106,52 @@ class _MagicCreateScopeState extends State<MagicCreateScope> {
 
 /// 监听模态/弹窗的出现，供全局加号在弹窗或对话框开启时自动隐藏，避免遮挡。
 class MagicPlusNavObserver extends NavigatorObserver {
+  static const hidePlusRouteName = 'hide-global-magic-plus';
+
   final ValueNotifier<int> modalDepth = ValueNotifier(0);
+  final ValueNotifier<int> hidePlusDepth = ValueNotifier(0);
 
   bool _isModal(Route<dynamic>? r) {
     if (r == null) return false;
     if (r is PopupRoute) return true;
     final name = r.runtimeType.toString().toLowerCase();
-    return name.contains('modal') || name.contains('sheet') || name.contains('dialog');
+    return name.contains('modal') ||
+        name.contains('sheet') ||
+        name.contains('dialog');
   }
 
   void _dec() {
     modalDepth.value = (modalDepth.value - 1).clamp(0, 1 << 30);
   }
 
+  void _decHidden() {
+    hidePlusDepth.value = (hidePlusDepth.value - 1).clamp(0, 1 << 30);
+  }
+
+  bool _hidesPlus(Route<dynamic>? r) => r?.settings.name == hidePlusRouteName;
+
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     if (_isModal(route)) modalDepth.value++;
+    if (_hidesPlus(route)) hidePlusDepth.value++;
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     if (_isModal(route)) _dec();
+    if (_hidesPlus(route)) _decHidden();
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     if (_isModal(route)) _dec();
+    if (_hidesPlus(route)) _decHidden();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (_hidesPlus(oldRoute)) _decHidden();
+    if (_hidesPlus(newRoute)) hidePlusDepth.value++;
   }
 }
 
@@ -152,7 +196,7 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
 
   void _openCreate({WhenChoice? overrideWhen}) {
     final ctx = MagicPlusController.instance.active.value;
-    AddEditItemModal.show(
+    AddEditItemModal.pushCreate(
       _navContext,
       projectId: ctx.projectId,
       headingId: ctx.headingId,
@@ -176,11 +220,26 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
                   return ValueListenableBuilder<int>(
                     valueListenable: widget.observer.modalDepth,
                     builder: (context, depth, _) {
-                      final keyboardUp = mq.viewInsets.bottom > 0;
-                      final show =
-                          depth == 0 && !keyboardUp && mq.size.width <= 600;
-                      if (!show) return const SizedBox.shrink();
-                      return _buildPlusLayer(context, mq);
+                      return ValueListenableBuilder<int>(
+                        valueListenable: widget.observer.hidePlusDepth,
+                        builder: (context, hiddenDepth, _) {
+                          return ValueListenableBuilder<MagicCreateContext>(
+                            valueListenable:
+                                MagicPlusController.instance.active,
+                            builder: (context, active, _) {
+                              final keyboardUp = mq.viewInsets.bottom > 0;
+                              final show =
+                                  depth == 0 &&
+                                  hiddenDepth == 0 &&
+                                  !keyboardUp &&
+                                  mq.size.width <= 600 &&
+                                  !active.hidePlus;
+                              if (!show) return const SizedBox.shrink();
+                              return _buildPlusLayer(context, mq);
+                            },
+                          );
+                        },
+                      );
                     },
                   );
                 },
@@ -205,35 +264,37 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
             builder: (context, dragging, _) {
               if (!dragging) return const SizedBox.shrink();
               return Row(
-                children: [
-                  Expanded(
-                    child: _dropZone(
-                      icon: Icons.inbox_rounded,
-                      label: '收件箱',
-                      onAccept: () => _openCreate(overrideWhen: WhenChoice.inbox),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _dropZone(
-                      icon: Icons.star_rounded,
-                      label: '今天',
-                      color: AppTheme.todayYellow,
-                      onAccept: () => _openCreate(overrideWhen: WhenChoice.today),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _dropZone(
-                      icon: Icons.nightlight_round,
-                      label: '今晚',
-                      color: AppTheme.eveningIndigo,
-                      onAccept: () =>
-                          _openCreate(overrideWhen: WhenChoice.thisEvening),
-                    ),
-                  ),
-                ],
-              )
+                    children: [
+                      Expanded(
+                        child: _dropZone(
+                          icon: Icons.inbox_rounded,
+                          label: '收件箱',
+                          onAccept: () =>
+                              _openCreate(overrideWhen: WhenChoice.inbox),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _dropZone(
+                          icon: Icons.star_rounded,
+                          label: '今天',
+                          color: AppTheme.todayYellow,
+                          onAccept: () =>
+                              _openCreate(overrideWhen: WhenChoice.today),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _dropZone(
+                          icon: Icons.nightlight_round,
+                          label: '今晚',
+                          color: AppTheme.eveningIndigo,
+                          onAccept: () =>
+                              _openCreate(overrideWhen: WhenChoice.thisEvening),
+                        ),
+                      ),
+                    ],
+                  )
                   .animate()
                   .fadeIn(duration: 160.ms)
                   .slideY(begin: -0.4, end: 0, curve: Curves.easeOut);
@@ -252,10 +313,7 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
             onDraggableCanceled: (_, _) => _endDrag(),
             feedback: const _Fab(elevated: true),
             childWhenDragging: const _Fab(ghost: true),
-            child: GestureDetector(
-              onTap: _openCreate,
-              child: const _Fab(),
-            ),
+            child: GestureDetector(onTap: _openCreate, child: const _Fab()),
           ),
         ),
       ],
@@ -297,10 +355,13 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
               children: [
                 Icon(icon, color: hot ? Colors.white : color, size: 20),
                 const SizedBox(width: 6),
-                Text(label,
-                    style: TextStyle(
-                        color: hot ? Colors.white : color,
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: hot ? Colors.white : color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ),

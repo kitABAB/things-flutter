@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/item_providers.dart';
 import '../theme/app_theme.dart';
+import 'smooth_dialog.dart';
 
 /// 移动目标。
 class MoveTarget {
@@ -11,25 +12,25 @@ class MoveTarget {
   final String? projectId;
   final String? projectTitle;
   const MoveTarget.inbox()
-      : inbox = true,
-        areaId = null,
-        areaTitle = null,
-        projectId = null,
-        projectTitle = null;
+    : inbox = true,
+      areaId = null,
+      areaTitle = null,
+      projectId = null,
+      projectTitle = null;
   const MoveTarget.area(this.areaId, this.areaTitle)
-      : inbox = false,
-        projectId = null,
-        projectTitle = null;
+    : inbox = false,
+      projectId = null,
+      projectTitle = null;
   const MoveTarget.project(this.projectId, this.projectTitle)
-      : inbox = false,
-        areaId = null,
-        areaTitle = null;
+    : inbox = false,
+      areaId = null,
+      areaTitle = null;
 }
 
 /// 选择把任务移动到哪里：收件箱 / 某领域 / 某项目（居中模态）。
 class MoveTargetSheet {
   static Future<MoveTarget?> show(BuildContext context) {
-    return showDialog<MoveTarget>(
+    return showSmoothDialog<MoveTarget>(
       context: context,
       builder: (_) => Dialog(
         clipBehavior: Clip.antiAlias,
@@ -66,19 +67,24 @@ class _MoveBody extends ConsumerWidget {
           ),
           for (final area in areas)
             ListTile(
-              leading: const Icon(Icons.dashboard_rounded,
-                  color: AppTheme.somedayGrey),
+              leading: const Icon(
+                Icons.dashboard_rounded,
+                color: AppTheme.somedayGrey,
+              ),
               title: Text(area.title),
-              onTap: () => Navigator.of(context)
-                  .pop(MoveTarget.area(area.id, area.title)),
+              onTap: () => Navigator.of(
+                context,
+              ).pop(MoveTarget.area(area.id, area.title)),
             ),
           for (final p in projects)
             ListTile(
-              leading:
-                  const Icon(Icons.folder_rounded, color: AppTheme.primaryBlue),
+              leading: const Icon(
+                Icons.folder_rounded,
+                color: AppTheme.primaryBlue,
+              ),
               title: Text(p.title),
-              onTap: () => Navigator.of(context)
-                  .pop(MoveTarget.project(p.id, p.title)),
+              onTap: () =>
+                  Navigator.of(context).pop(MoveTarget.project(p.id, p.title)),
             ),
           const SizedBox(height: 8),
         ],

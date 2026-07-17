@@ -13,6 +13,9 @@ import '../utils/date_format.dart';
 import 'capture_review_sheet.dart';
 import 'when_picker_sheet.dart';
 import 'move_target_sheet.dart';
+import 'smooth_dialog.dart';
+
+const _hideGlobalMagicPlusRoute = 'hide-global-magic-plus';
 
 /// 新建 / 编辑任务的居中模态框（白纸优先，高度随内容自适应）。
 ///
@@ -26,6 +29,7 @@ class AddEditItemModal extends ConsumerStatefulWidget {
   final WhenChoice? defaultWhen;
   final String? projectId;
   final String? headingId;
+  final bool asPage;
 
   const AddEditItemModal({
     super.key,
@@ -33,6 +37,7 @@ class AddEditItemModal extends ConsumerStatefulWidget {
     this.defaultWhen,
     this.projectId,
     this.headingId,
+    this.asPage = false,
   });
 
   /// 以居中模态框打开。
@@ -43,7 +48,7 @@ class AddEditItemModal extends ConsumerStatefulWidget {
     String? projectId,
     String? headingId,
   }) {
-    return showDialog(
+    return showSmoothDialog(
       context: context,
       barrierDismissible: true,
       builder: (_) => AddEditItemModal(
@@ -51,6 +56,45 @@ class AddEditItemModal extends ConsumerStatefulWidget {
         defaultWhen: defaultWhen,
         projectId: projectId,
         headingId: headingId,
+      ),
+    );
+  }
+
+  /// 以完整页面打开新建任务。编辑仍使用 [show]，避免详情页/桌面检查器被整页打断。
+  static Future<void> pushCreate(
+    BuildContext context, {
+    WhenChoice? defaultWhen,
+    String? projectId,
+    String? headingId,
+  }) {
+    return Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        settings: const RouteSettings(name: _hideGlobalMagicPlusRoute),
+        transitionDuration: const Duration(milliseconds: 260),
+        reverseTransitionDuration: const Duration(milliseconds: 190),
+        pageBuilder: (_, _, _) => AddEditItemModal(
+          defaultWhen: defaultWhen,
+          projectId: projectId,
+          headingId: headingId,
+          asPage: true,
+        ),
+        transitionsBuilder: (context, animation, _, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.08),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -90,7 +134,10 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
       _when = widget.defaultWhen ?? WhenChoice.inbox;
     }
     if (!_isEdit) {
-      Future.delayed(const Duration(milliseconds: 120), _focusNode.requestFocus);
+      Future.delayed(
+        const Duration(milliseconds: 120),
+        _focusNode.requestFocus,
+      );
     }
   }
 
@@ -155,14 +202,16 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
   }
 
   Future<void> _pickTags() async {
-    final result = await showDialog<Set<String>>(
+    final result = await showSmoothDialog<Set<String>>(
       context: context,
       builder: (_) => _TagSelectDialog(initial: _tagIds),
     );
     if (result != null) {
-      setState(() => _tagIds
-        ..clear()
-        ..addAll(result));
+      setState(
+        () => _tagIds
+          ..clear()
+          ..addAll(result),
+      );
     }
   }
 
@@ -194,8 +243,12 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
     if (_isEdit) {
       final id = widget.existing!.id;
       await repo.updateContent(id, title: title);
-      await repo.setWhen(id,
-          start: start, startDate: _when.startDate, evening: _when.evening);
+      await repo.setWhen(
+        id,
+        start: start,
+        startDate: _when.startDate,
+        evening: _when.evening,
+      );
       await repo.setDeadline(id, _deadline);
       if (_when.reminderTime != null) {
         await repo.setReminder(id, _when.reminderTime);
@@ -237,12 +290,15 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
     final parser = ref.read(captureParserProvider);
     final ctx = CaptureContext(
       now: DateTime.now(),
-      projectNames:
-          (ref.read(projectsProvider).value ?? []).map((e) => e.title).toList(),
-      areaNames:
-          (ref.read(areasProvider).value ?? []).map((e) => e.title).toList(),
-      tagNames:
-          (ref.read(tagsProvider).value ?? []).map((e) => e.title).toList(),
+      projectNames: (ref.read(projectsProvider).value ?? [])
+          .map((e) => e.title)
+          .toList(),
+      areaNames: (ref.read(areasProvider).value ?? [])
+          .map((e) => e.title)
+          .toList(),
+      tagNames: (ref.read(tagsProvider).value ?? [])
+          .map((e) => e.title)
+          .toList(),
     );
 
     CaptureDraft draft;
@@ -251,17 +307,20 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
     } on LlmException catch (e) {
       if (!mounted) return;
       setState(() => _aiBusy = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(e.isNotConfigured
-            ? '尚未配置 AI 的 API Key'
-            : '拆解失败：${e.message}'),
-      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.isNotConfigured ? '尚未配置 AI 的 API Key' : '拆解失败：${e.message}',
+          ),
+        ),
+      );
       return;
     } catch (e) {
       if (!mounted) return;
       setState(() => _aiBusy = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('拆解失败：$e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('拆解失败：$e')));
       return;
     }
 
@@ -270,9 +329,9 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
 
     // 没拆出更多结构 -> 不打断，提示用户可直接保存为单条。
     if (!draft.hasStructure) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没拆出更多结构，可直接保存为单条')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('没拆出更多结构，可直接保存为单条')));
       return;
     }
 
@@ -289,140 +348,228 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final maxH = math.min(560.0, mq.size.height * 0.82);
     final tags = ref.watch(tagsProvider).value ?? [];
     final tagTitleById = {for (final t in tags) t.id: t.title};
     final aiEnabled = ref.watch(aiEnabledProvider);
 
+    if (widget.asPage) {
+      return _buildPage(context, tagTitleById, aiEnabled);
+    }
+
+    final mq = MediaQuery.of(context);
+    final maxH = math.min(520.0, mq.size.height * 0.78);
+
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 600, maxHeight: maxH),
+        child: _dialogContent(context, tagTitleById, aiEnabled),
+      ),
+    );
+  }
+
+  Widget _buildPage(
+    BuildContext context,
+    Map<String, String> tagTitleById,
+    bool aiEnabled,
+  ) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        leading: IconButton(
+          tooltip: '关闭',
+          icon: const Icon(Icons.close_rounded, size: 21),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        titleSpacing: 0,
+        title: Text(
+          _isEdit ? '编辑任务' : '新建任务',
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _titleController.text.trim().isEmpty ? null : _save,
+            child: Text(_isEdit ? '完成' : '保存'),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // —— 顶部标题（固定）——
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 3),
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      border:
-                          Border.all(color: Colors.grey.shade400, width: 1.6),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: TextField(
-                      controller: _titleController,
-                      focusNode: _focusNode,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(fontWeight: FontWeight.w600),
-                      maxLines: null,
-                      decoration: const InputDecoration(
-                        hintText: '新建任务',
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: (_) => _save(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // —— 中部 chips（自适应，超出滚动）——
-            Flexible(
+            Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(62, 4, 24, 4),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_whenActive)
-                      _chip(
-                        icon: Icons.calendar_today_rounded,
-                        color: AppTheme.todayYellow,
-                        label: _whenLabel(),
-                        onClear: () =>
-                            setState(() => _when = WhenChoice.inbox),
-                      ),
-                    if (_deadline != null)
-                      _chip(
-                        icon: Icons.flag_rounded,
-                        color: AppTheme.deadlineRed,
-                        label: DateFmt.deadlineLabel(_deadline!),
-                        onClear: () => setState(() => _deadline = null),
-                      ),
-                    for (final id in _tagIds)
-                      _chip(
-                        icon: Icons.label_outline_rounded,
-                        color: AppTheme.primaryBlue,
-                        label: tagTitleById[id] ?? '标签',
-                        onClear: () => setState(() => _tagIds.remove(id)),
-                      ),
+                    _titleRow(context, pageMode: true),
+                    const SizedBox(height: 18),
+                    _chipsWrap(tagTitleById),
                   ],
                 ),
               ),
             ),
-
             const Divider(height: 1),
-
-            // —— 底部工具条（固定）——
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 14, 10),
-              child: Row(
-                children: [
-                  _tool(
-                    icon: Icons.inbox_rounded,
-                    label: _listLabel(),
-                    highlighted: true,
-                    onTap: _pickList,
-                  ),
-                  _tool(
-                    icon: Icons.calendar_today_rounded,
-                    onTap: _pickWhen,
-                  ),
-                  _tool(
-                    icon: Icons.flag_rounded,
-                    onTap: _pickDeadline,
-                  ),
-                  if (!_isEdit)
-                    _tool(
-                      icon: Icons.label_outline_rounded,
-                      onTap: _pickTags,
-                    ),
-                  if (!_isEdit && aiEnabled) _aiTool(),
-                  const Spacer(),
-                  FilledButton(
-                    onPressed:
-                        _titleController.text.trim().isEmpty ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppTheme.primaryBlue,
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                    ),
-                    child: Text(_isEdit ? '完成' : '保存'),
-                  ),
-                ],
-              ),
-            ),
+            _toolbar(context, aiEnabled: aiEnabled, pageMode: true),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _dialogContent(
+    BuildContext context,
+    Map<String, String> tagTitleById,
+    bool aiEnabled,
+  ) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _titleRow(context, pageMode: false),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(56, 4, 22, 6),
+            child: _chipsWrap(tagTitleById),
+          ),
+        ),
+        const Divider(height: 1),
+        _toolbar(context, aiEnabled: aiEnabled, pageMode: false),
+      ],
+    );
+  }
+
+  Widget _titleRow(BuildContext context, {required bool pageMode}) {
+    return Padding(
+      padding: pageMode
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(22, 20, 22, 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: EdgeInsets.only(top: pageMode ? 5 : 3),
+            width: pageMode ? 22 : 21,
+            height: pageMode ? 22 : 21,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.grey.shade400, width: 1.5),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: TextField(
+              controller: _titleController,
+              focusNode: _focusNode,
+              style: TextStyle(
+                fontSize: pageMode ? 20 : 18.5,
+                fontWeight: FontWeight.w600,
+                height: 1.28,
+                color: AppTheme.textPrimary,
+                letterSpacing: 0,
+              ),
+              maxLines: null,
+              decoration: InputDecoration(
+                hintText: '新建任务',
+                hintStyle: TextStyle(
+                  color: AppTheme.textSecondary.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w500,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _save(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipsWrap(Map<String, String> tagTitleById) {
+    final chips = <Widget>[];
+    if (_whenActive) {
+      chips.add(
+        _chip(
+          icon: Icons.calendar_today_rounded,
+          color: AppTheme.todayYellow,
+          label: _whenLabel(),
+          onClear: () => setState(() => _when = WhenChoice.inbox),
+        ),
+      );
+    }
+    if (_deadline != null) {
+      chips.add(
+        _chip(
+          icon: Icons.flag_rounded,
+          color: AppTheme.deadlineRed,
+          label: DateFmt.deadlineLabel(_deadline!),
+          onClear: () => setState(() => _deadline = null),
+        ),
+      );
+    }
+    for (final id in _tagIds) {
+      chips.add(
+        _chip(
+          icon: Icons.label_outline_rounded,
+          color: AppTheme.primaryBlue,
+          label: tagTitleById[id] ?? '标签',
+          onClear: () => setState(() => _tagIds.remove(id)),
+        ),
+      );
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+
+  Widget _toolbar(
+    BuildContext context, {
+    required bool aiEnabled,
+    required bool pageMode,
+  }) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12, pageMode ? 10 : 8, 14, 10),
+      child: Row(
+        children: [
+          _tool(
+            icon: Icons.inbox_rounded,
+            label: _listLabel(),
+            highlighted: true,
+            onTap: _pickList,
+          ),
+          _tool(icon: Icons.calendar_today_rounded, onTap: _pickWhen),
+          _tool(icon: Icons.flag_rounded, onTap: _pickDeadline),
+          if (!_isEdit)
+            _tool(icon: Icons.label_outline_rounded, onTap: _pickTags),
+          if (!_isEdit && aiEnabled) _aiTool(),
+          const Spacer(),
+          if (!pageMode)
+            FilledButton(
+              onPressed: _titleController.text.trim().isEmpty ? null : _save,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primaryBlue,
+                minimumSize: const Size(0, 38),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                textStyle: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              child: Text(_isEdit ? '完成' : '保存'),
+            ),
+        ],
       ),
     );
   }
@@ -441,7 +588,9 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 1),
         padding: EdgeInsets.symmetric(
-            horizontal: label == null ? 10 : 11, vertical: 9),
+          horizontal: label == null ? 10 : 11,
+          vertical: 9,
+        ),
         decoration: BoxDecoration(
           color: highlighted
               ? AppTheme.primaryBlue.withValues(alpha: 0.10)
@@ -454,11 +603,14 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
             Icon(icon, size: 19, color: color),
             if (label != null) ...[
               const SizedBox(width: 6),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13.5,
-                      color: color,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ],
         ),
@@ -481,7 +633,9 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
                 width: 19,
                 height: 19,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: AppTheme.primaryBlue),
+                  strokeWidth: 2,
+                  color: AppTheme.primaryBlue,
+                ),
               )
             : Icon(Icons.auto_awesome_rounded, size: 19, color: color),
       ),
@@ -505,9 +659,14 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
         children: [
           Icon(icon, size: 15, color: color),
           const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 13, color: color, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           GestureDetector(
             onTap: onClear,
             child: Padding(
@@ -600,8 +759,10 @@ class _TagSelectDialogState extends ConsumerState<_TagSelectDialog> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.add_circle,
-                        color: AppTheme.primaryBlue),
+                    icon: const Icon(
+                      Icons.add_circle,
+                      color: AppTheme.primaryBlue,
+                    ),
                     onPressed: _createAndSelect,
                   ),
                 ],

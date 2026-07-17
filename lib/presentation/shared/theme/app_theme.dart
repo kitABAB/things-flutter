@@ -37,7 +37,8 @@ class AppTheme {
   ///   - 其他平台（Android / Windows / Linux）：用 Noto Sans SC，中文显示一致清晰。
   ///     （SF Pro 为 Apple 专有字体，无法在非 Apple 平台合法内嵌分发。）
   static TextTheme _applyFont(TextTheme base) {
-    final isApple = !kIsWeb &&
+    final isApple =
+        !kIsWeb &&
         (defaultTargetPlatform == TargetPlatform.iOS ||
             defaultTargetPlatform == TargetPlatform.macOS);
     if (isApple) {
@@ -51,10 +52,12 @@ class AppTheme {
     final dark = brightness == Brightness.dark;
     final surface = dark ? const Color(0xFF1E1E20) : Colors.white;
     final scaffold = dark ? const Color(0xFF141416) : Colors.white;
-    final textPrimaryC =
-        dark ? const Color(0xFFECECEC) : const Color(0xFF1E1E1E);
-    final textSecondaryC =
-        dark ? const Color(0xFF98989F) : const Color(0xFF8E8E93);
+    final textPrimaryC = dark
+        ? const Color(0xFFECECEC)
+        : const Color(0xFF1E1E1E);
+    final textSecondaryC = dark
+        ? const Color(0xFF98989F)
+        : const Color(0xFF8E8E93);
     final divider = dark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA);
 
     return ThemeData(
@@ -74,21 +77,27 @@ class AppTheme {
         // 在已套用字体族的基础上覆盖字号 / 字重，保留 fontFamily 与 fallback。
         return themed.copyWith(
           titleLarge: themed.titleLarge?.copyWith(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: textPrimaryC,
-              letterSpacing: -0.6),
+            fontSize: 30,
+            fontWeight: FontWeight.w800,
+            color: textPrimaryC,
+            letterSpacing: 0,
+          ),
           titleMedium: themed.titleMedium?.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: textPrimaryC,
-              letterSpacing: -0.3),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: textPrimaryC,
+            letterSpacing: 0,
+          ),
           bodyLarge: themed.bodyLarge?.copyWith(
-              fontSize: 17, fontWeight: FontWeight.w400, color: textPrimaryC),
+            fontSize: 17,
+            fontWeight: FontWeight.w400,
+            color: textPrimaryC,
+          ),
           bodyMedium: themed.bodyMedium?.copyWith(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w400,
-              color: textSecondaryC),
+            fontSize: 13.5,
+            fontWeight: FontWeight.w400,
+            color: textSecondaryC,
+          ),
         );
       }(),
       appBarTheme: AppBarTheme(
@@ -97,13 +106,12 @@ class AppTheme {
         scrolledUnderElevation: 0,
         iconTheme: const IconThemeData(color: primaryBlue),
         titleTextStyle: TextStyle(
-            fontSize: 18, fontWeight: FontWeight.w600, color: textPrimaryC),
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: textPrimaryC,
+        ),
       ),
-      dividerTheme: DividerThemeData(
-        color: divider,
-        thickness: 0.5,
-        space: 1,
-      ),
+      dividerTheme: DividerThemeData(color: divider, thickness: 0.5, space: 1),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryBlue,
         foregroundColor: Colors.white,

@@ -9,6 +9,7 @@ import '../../ai/core/llm_exception.dart';
 import '../../ai/core/llm_message.dart';
 import '../../ai/providers/openai_compat_client.dart';
 import '../shared/theme/app_theme.dart';
+import '../shared/widgets/magic_plus.dart';
 
 class AiSettingsScreen extends ConsumerStatefulWidget {
   const AiSettingsScreen({super.key});
@@ -94,6 +95,20 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
   }
 
   void _openAdvanced(AiSettings settings) {
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          insetPadding: const EdgeInsets.all(32),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: SizedBox(
+            width: 430,
+            child: _FunctionStrategySheet(settings: settings),
+          ),
+        ),
+      );
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -113,9 +128,27 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(aiSettingsProvider);
     final connections = settings.connections;
+    final desktop = MediaQuery.sizeOf(context).width >= 900;
 
+    if (desktop) {
+      return _buildDesktop(context, settings, connections);
+    }
+
+    return MagicCreateScope(
+      context: const MagicCreateContext(hidePlus: true),
+      child: _buildMobile(context, settings, connections),
+    );
+  }
+
+  Widget _buildMobile(
+    BuildContext context,
+    AiSettings settings,
+    List<ModelConnection> connections,
+  ) {
     return Scaffold(
+      backgroundColor: _AiPalette.page(context),
       appBar: AppBar(
+        backgroundColor: _AiPalette.page(context),
         leading: const BackButton(),
         titleSpacing: 0,
         title: _StrategyTitle(
@@ -142,6 +175,10 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
           ),
           IconButton.filled(
             tooltip: '添加',
+            style: IconButton.styleFrom(
+              backgroundColor: AppTheme.primaryBlue,
+              foregroundColor: Colors.white,
+            ),
             onPressed: _addDraft,
             icon: const Icon(Icons.add_rounded),
           ),
@@ -200,6 +237,383 @@ class _AiSettingsScreenState extends ConsumerState<AiSettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDesktop(
+    BuildContext context,
+    AiSettings settings,
+    List<ModelConnection> connections,
+  ) {
+    return Scaffold(
+      backgroundColor: _AiPalette.page(context),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              height: 66,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              decoration: BoxDecoration(
+                color: _AiPalette.panel(context),
+                border: Border(
+                  bottom: BorderSide(color: _AiPalette.line(context)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const BackButton(),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 320,
+                    child: _StrategyTitle(
+                      name: settings.strategyName,
+                      onChanged: (value) => ref
+                          .read(aiSettingsProvider.notifier)
+                          .renameStrategy(value),
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: '功能策略',
+                    onPressed: () => _openAdvanced(settings),
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                  IconButton(
+                    tooltip: '批量测试',
+                    onPressed: _batchTesting
+                        ? null
+                        : () => _batchTest(settings),
+                    icon: _batchTesting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.bolt_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _addDraft,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('添加'),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 20, 14, 24),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: _AiPalette.panel(context),
+                            border: Border.all(color: _AiPalette.line(context)),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: connections.isEmpty
+                              ? _EmptyStrategy(onAdd: _addDraft)
+                              : _connectionList(
+                                  settings,
+                                  connections,
+                                  const EdgeInsets.fromLTRB(18, 18, 18, 24),
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  _AiDesktopAside(
+                    settings: settings,
+                    batchTesting: _batchTesting,
+                    onAdvanced: () => _openAdvanced(settings),
+                    onBatchTest: () => _batchTest(settings),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _connectionList(
+    AiSettings settings,
+    List<ModelConnection> connections,
+    EdgeInsets padding,
+  ) {
+    return ReorderableListView.builder(
+      padding: padding,
+      itemCount: connections.length,
+      onReorderItem: ref.read(aiSettingsProvider.notifier).reorderConnection,
+      buildDefaultDragHandles: false,
+      itemBuilder: (context, index) {
+        final conn = connections[index];
+        return Padding(
+          key: ValueKey(conn.id),
+          padding: const EdgeInsets.only(bottom: 10),
+          child: _ModelStrategyCard(
+            index: index,
+            connection: conn,
+            settings: settings,
+            expanded: _expandedIds.contains(conn.id),
+            onExpandedChanged: (expanded) {
+              setState(() {
+                if (expanded) {
+                  _expandedIds.add(conn.id);
+                } else {
+                  _expandedIds.remove(conn.id);
+                }
+              });
+              if (!conn.isReady) _toast('草稿已保存');
+            },
+            onChanged: (next) =>
+                ref.read(aiSettingsProvider.notifier).upsertConnection(next),
+            onDelete: () =>
+                ref.read(aiSettingsProvider.notifier).removeConnection(conn.id),
+            onTest: () => _testConnection(conn),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AiPalette {
+  static bool _dark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color page(BuildContext context) =>
+      _dark(context) ? const Color(0xFF101115) : const Color(0xFFF5F7FA);
+
+  static Color panel(BuildContext context) =>
+      _dark(context) ? const Color(0xFF15171C) : Colors.white;
+
+  static Color card(BuildContext context, {required bool gateway}) {
+    if (_dark(context)) {
+      return gateway ? const Color(0xFF1A1722) : const Color(0xFF171A20);
+    }
+    return gateway ? const Color(0xFFF8F6FF) : Colors.white;
+  }
+
+  static Color cardBorder(
+    BuildContext context, {
+    required bool gateway,
+    required bool complete,
+  }) {
+    if (!complete) return warning(context).withValues(alpha: 0.85);
+    if (gateway) {
+      return gatewayAccent.withValues(alpha: _dark(context) ? 0.34 : 0.24);
+    }
+    return line(context);
+  }
+
+  static Color line(BuildContext context) =>
+      _dark(context) ? const Color(0xFF2B3038) : const Color(0xFFE1E5EC);
+
+  static Color field(BuildContext context) =>
+      _dark(context) ? const Color(0xFF101218) : const Color(0xFFF8FAFC);
+
+  static Color control(BuildContext context) =>
+      _dark(context) ? const Color(0xFF222631) : const Color(0xFFF0F3F7);
+
+  static Color controlActive(BuildContext context) =>
+      _dark(context) ? const Color(0xFF11141A) : Colors.white;
+
+  static Color text(BuildContext context) =>
+      _dark(context) ? const Color(0xFFF3F5F7) : const Color(0xFF1A1D23);
+
+  static Color muted(BuildContext context) =>
+      _dark(context) ? const Color(0xFFA2AAB6) : const Color(0xFF737B87);
+
+  static Color subtle(BuildContext context) =>
+      _dark(context) ? const Color(0xFF7D8490) : const Color(0xFF9AA1AC);
+
+  static Color selectedFill(BuildContext context) => _dark(context)
+      ? AppTheme.primaryBlue.withValues(alpha: 0.18)
+      : AppTheme.primaryBlue.withValues(alpha: 0.08);
+
+  static Color warning(BuildContext context) =>
+      _dark(context) ? const Color(0xFFE6A817) : const Color(0xFFD99A00);
+
+  static Color warningBg(BuildContext context) =>
+      _dark(context) ? const Color(0xFF302612) : const Color(0xFFFFF4D6);
+
+  static Color warningText(BuildContext context) =>
+      _dark(context) ? const Color(0xFFF5CF75) : const Color(0xFF7C5600);
+
+  static Color protocolBg(BuildContext context) =>
+      _dark(context) ? const Color(0xFF141821) : const Color(0xFFF1F4F8);
+
+  static Color protocolText(BuildContext context) =>
+      _dark(context) ? const Color(0xFFC9D0DA) : const Color(0xFF4D5663);
+
+  static const Color gatewayAccent = Color(0xFF8B7CF6);
+}
+
+class _AiDesktopAside extends StatelessWidget {
+  final AiSettings settings;
+  final bool batchTesting;
+  final VoidCallback onAdvanced;
+  final VoidCallback onBatchTest;
+
+  const _AiDesktopAside({
+    required this.settings,
+    required this.batchTesting,
+    required this.onAdvanced,
+    required this.onBatchTest,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = settings.readyConnections.length;
+    final total = settings.connections.length;
+
+    return Container(
+      width: 320,
+      margin: const EdgeInsets.fromLTRB(0, 20, 24, 24),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: _AiPalette.panel(context),
+        border: Border.all(color: _AiPalette.line(context)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  color: AppTheme.primaryBlue,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  settings.strategyName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _AsideMetric(label: '可用', value: '$ready'),
+          const SizedBox(height: 8),
+          _AsideMetric(label: '全部', value: '$total'),
+          const SizedBox(height: 18),
+          const Divider(),
+          const SizedBox(height: 10),
+          _AsideAction(
+            icon: Icons.tune_rounded,
+            label: '功能策略',
+            onTap: onAdvanced,
+          ),
+          _AsideAction(
+            icon: Icons.bolt_rounded,
+            label: batchTesting ? '测试中' : '批量测试',
+            onTap: batchTesting ? null : onBatchTest,
+          ),
+          const Spacer(),
+          Text(
+            'OpenAI-compatible',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AsideMetric extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _AsideMetric({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _AiPalette.control(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AsideAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  const _AsideAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: _AiPalette.muted(context)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -273,7 +687,7 @@ class _StrategyTitleState extends State<_StrategyTitle> {
             Text(
               '已自动保存',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
+                color: _AiPalette.muted(context),
                 fontSize: 11,
               ),
             ),
@@ -304,19 +718,22 @@ class _AddCardButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 58,
         width: double.infinity,
         decoration: BoxDecoration(
-          color: AppTheme.primaryBlue.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(20),
+          color: _AiPalette.control(context).withValues(alpha: 0.44),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: AppTheme.primaryBlue.withValues(alpha: 0.24),
-            width: 1.4,
+            color: AppTheme.primaryBlue.withValues(alpha: 0.22),
+            width: 1,
           ),
         ),
-        child: const Icon(Icons.add_rounded, color: AppTheme.primaryBlue),
+        child: Icon(
+          Icons.add_rounded,
+          color: AppTheme.primaryBlue.withValues(alpha: 0.86),
+        ),
       ),
     );
   }
@@ -394,34 +811,36 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
   Widget build(BuildContext context) {
     final conn = widget.connection;
     final complete = conn.isReady;
-    final color = _isGateway
-        ? const Color(0xFFF8F3FF)
-        : const Color(0xFFF8FBFF);
-    final border = !complete
-        ? const Color(0xFFE5B94D)
-        : _isGateway
-        ? const Color(0xFFE7DFFF)
-        : Theme.of(context).dividerColor;
+    final color = _AiPalette.card(context, gateway: _isGateway);
+    final border = _AiPalette.cardBorder(
+      context,
+      gateway: _isGateway,
+      complete: complete,
+    );
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
         color: color,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: border, width: complete ? 1 : 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0.20
+                  : 0.05,
+            ),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Column(
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(8),
             onTap: () => widget.onExpandedChanged(!widget.expanded),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
@@ -431,7 +850,7 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
                     index: widget.index,
                     child: Icon(
                       Icons.drag_handle_rounded,
-                      color: AppTheme.textSecondary,
+                      color: _AiPalette.subtle(context),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -447,10 +866,12 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
                     tooltip: '测试',
                     onPressed: widget.onTest,
                     icon: const Icon(Icons.bolt_rounded),
+                    color: AppTheme.primaryBlue,
                   ),
                   IconButton(
                     tooltip: widget.expanded ? '收起' : '展开',
                     onPressed: () => widget.onExpandedChanged(!widget.expanded),
+                    color: _AiPalette.subtle(context),
                     icon: AnimatedRotation(
                       turns: widget.expanded ? 0.5 : 0,
                       duration: const Duration(milliseconds: 180),
@@ -519,6 +940,7 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
           controller: _apiKey,
           hintText: 'API Key',
           mono: true,
+          secret: true,
           onChanged: (value) => _saveCloud(apiKey: value),
         ),
         const SizedBox(height: 8),
@@ -531,7 +953,7 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
             tooltip: '删除',
             onPressed: widget.onDelete,
             icon: const Icon(Icons.delete_outline_rounded),
-            color: AppTheme.textSecondary,
+            color: _AiPalette.subtle(context),
           ),
         ),
       ],
@@ -564,6 +986,7 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
           controller: _gatewayKey,
           hintText: 'API Key 可选',
           mono: true,
+          secret: true,
           onChanged: (value) => _saveGateway(apiKey: value),
         ),
         const SizedBox(height: 8),
@@ -579,6 +1002,17 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
           children: [
             FilledButton.tonalIcon(
               onPressed: _fetching ? null : _fetchModels,
+              style: FilledButton.styleFrom(
+                backgroundColor: _AiPalette.control(context),
+                foregroundColor: _AiPalette.text(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+              ),
               icon: _fetching
                   ? const SizedBox(
                       width: 14,
@@ -591,6 +1025,12 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
             const SizedBox(width: 8),
             TextButton.icon(
               onPressed: () => setState(() => _protocolOpen = !_protocolOpen),
+              style: TextButton.styleFrom(
+                foregroundColor: _AiPalette.muted(context),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               icon: AnimatedRotation(
                 turns: _protocolOpen ? 0.5 : 0,
                 duration: const Duration(milliseconds: 180),
@@ -611,13 +1051,20 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF6DB),
-              borderRadius: BorderRadius.circular(14),
+              color: _AiPalette.protocolBg(context),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _AiPalette.line(context)),
             ),
             child: Text(
               'OpenAI Chat Completions: POST {baseUrl}/chat/completions\n'
               '可选: GET {baseUrl}/models',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: TextStyle(
+                color: _AiPalette.protocolText(context),
+                fontFamily: 'monospace',
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
@@ -631,6 +1078,20 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
                 label: Text(model),
                 selected: widget.connection.models.contains(model),
                 onSelected: (_) => _toggleGatewayModel(model),
+                selectedColor: _AiPalette.selectedFill(context),
+                backgroundColor: _AiPalette.control(context),
+                checkmarkColor: AppTheme.primaryBlue,
+                labelStyle: TextStyle(
+                  color: widget.connection.models.contains(model)
+                      ? AppTheme.primaryBlue
+                      : _AiPalette.muted(context),
+                  fontWeight: FontWeight.w700,
+                ),
+                side: BorderSide(
+                  color: widget.connection.models.contains(model)
+                      ? AppTheme.primaryBlue.withValues(alpha: 0.42)
+                      : _AiPalette.line(context),
+                ),
               ),
           ],
         ),
@@ -644,7 +1105,7 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
             tooltip: '删除',
             onPressed: widget.onDelete,
             icon: const Icon(Icons.delete_outline_rounded),
-            color: AppTheme.textSecondary,
+            color: _AiPalette.subtle(context),
           ),
         ),
       ],
@@ -718,14 +1179,15 @@ class _ModelStrategyCardState extends State<_ModelStrategyCard> {
 
   void _switchMode(bool gateway) {
     if (gateway) {
-      _saveGateway(
-        label: widget.connection.label.isNotEmpty
-            ? widget.connection.label
-            : '公司网关',
-        baseUrl: '',
-        apiKey: '',
-        models: const [],
-      );
+      final currentLabel = widget.connection.label.trim();
+      final cloudPresetLabel = _presets.any((p) => p.name == currentLabel);
+      final nextLabel =
+          currentLabel.isEmpty ||
+              cloudPresetLabel ||
+              widget.connection.provider != AiProvider.custom
+          ? '自定义网关'
+          : currentLabel;
+      _saveGateway(label: nextLabel, baseUrl: '', apiKey: '', models: const []);
     } else {
       final preset = _presets.first;
       _selectPreset(preset);
@@ -805,7 +1267,11 @@ class _CardTitle extends StatelessWidget {
           title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800),
+          style: TextStyle(
+            color: _AiPalette.text(context),
+            fontSize: 15.5,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 3),
         Row(
@@ -816,7 +1282,7 @@ class _CardTitle extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: AppTheme.textSecondary,
+                  color: _AiPalette.muted(context),
                   fontWeight: FontWeight.w600,
                   fontSize: 12,
                 ),
@@ -831,13 +1297,14 @@ class _CardTitle extends StatelessWidget {
   }
 
   static String _titleFor(ModelConnection connection) {
-    if (connection.primaryModel.isEmpty) return '选择模型';
     if (connection.provider == AiProvider.custom) {
       final label = connection.label.trim().isEmpty
           ? '自定义网关'
           : connection.label.trim();
+      if (connection.primaryModel.isEmpty) return label;
       return '$label / ${connection.primaryModel}';
     }
+    if (connection.primaryModel.isEmpty) return '选择模型';
     final preset = _presets.where((p) => p.model == connection.primaryModel);
     return preset.isEmpty ? connection.primaryModel : preset.first.name;
   }
@@ -857,7 +1324,7 @@ class _ProviderLogo extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: style.background,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         style.letter,
@@ -871,8 +1338,8 @@ class _ProviderLogo extends StatelessWidget {
   }
 
   _LogoStyle _logoStyle(ModelConnection c) {
-    if (c.primaryModel.isEmpty) {
-      return const _LogoStyle('+', Color(0xFFFFF6DB), Color(0xFFD99A00));
+    if (c.primaryModel.isEmpty && c.provider != AiProvider.custom) {
+      return const _LogoStyle('+', Color(0xFFFFF4D6), Color(0xFFD99A00));
     }
     switch (c.provider) {
       case AiProvider.gemini:
@@ -882,7 +1349,7 @@ class _ProviderLogo extends StatelessWidget {
       case AiProvider.deepseek:
         return const _LogoStyle('D', Color(0xFFE7FAF8), Color(0xFF13A9A0));
       case AiProvider.custom:
-        return const _LogoStyle('Q', Color(0xFFF1EFFF), Color(0xFF6A5CE7));
+        return const _LogoStyle('网', Color(0xFFF0ECFF), Color(0xFF7A67F2));
     }
   }
 }
@@ -903,11 +1370,11 @@ class _StatusLight extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = !connection.isReady
-        ? const Color(0xFFD99A00)
+        ? _AiPalette.warning(context)
         : switch (connection.status) {
             ModelConnectionStatus.ok => const Color(0xFF20B26B),
             ModelConnectionStatus.failed => const Color(0xFFE5484D),
-            ModelConnectionStatus.unknown => const Color(0xFFD99A00),
+            ModelConnectionStatus.unknown => _AiPalette.warning(context),
           };
     return Container(
       width: 9,
@@ -936,12 +1403,12 @@ class _WarningIcon extends StatelessWidget {
       width: 24,
       height: 24,
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF6DB),
-        borderRadius: BorderRadius.circular(9),
+        color: _AiPalette.warningBg(context),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: const Icon(
+      child: Icon(
         Icons.priority_high_rounded,
-        color: Color(0xFFD99A00),
+        color: _AiPalette.warning(context),
         size: 17,
       ),
     );
@@ -959,8 +1426,8 @@ class _ModeSwitch extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(15),
+        color: _AiPalette.control(context),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -999,18 +1466,18 @@ class _ModeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: active ? Theme.of(context).colorScheme.surface : null,
-          borderRadius: BorderRadius.circular(12),
+          color: active ? _AiPalette.controlActive(context) : null,
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: active ? AppTheme.primaryBlue : AppTheme.textSecondary,
+            color: active ? AppTheme.primaryBlue : _AiPalette.muted(context),
             fontWeight: FontWeight.w800,
             fontSize: 12.5,
           ),
@@ -1027,18 +1494,22 @@ class _SearchBox extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        color: _AiPalette.field(context),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _AiPalette.line(context)),
       ),
       child: Row(
         children: [
-          Icon(Icons.search_rounded, size: 18, color: AppTheme.textSecondary),
+          Icon(
+            Icons.search_rounded,
+            size: 18,
+            color: _AiPalette.subtle(context),
+          ),
           const SizedBox(width: 8),
           Text(
             'gpt / gemini / deepseek',
             style: TextStyle(
-              color: AppTheme.textSecondary,
+              color: _AiPalette.muted(context),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1062,10 +1533,10 @@ class _FilterChip extends StatelessWidget {
         label: Text(label),
         visualDensity: VisualDensity.compact,
         backgroundColor: active
-            ? AppTheme.primaryBlue.withValues(alpha: 0.10)
-            : Theme.of(context).colorScheme.surfaceContainerHighest,
+            ? _AiPalette.selectedFill(context)
+            : _AiPalette.control(context),
         labelStyle: TextStyle(
-          color: active ? AppTheme.primaryBlue : AppTheme.textSecondary,
+          color: active ? AppTheme.primaryBlue : _AiPalette.muted(context),
           fontWeight: FontWeight.w700,
           fontSize: 12,
         ),
@@ -1092,18 +1563,18 @@ class _PresetTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 7),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         child: Container(
           padding: const EdgeInsets.all(9),
           decoration: BoxDecoration(
             color: selected
-                ? AppTheme.primaryBlue.withValues(alpha: 0.06)
-                : Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(16),
+                ? _AiPalette.selectedFill(context)
+                : _AiPalette.field(context),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: selected
                   ? AppTheme.primaryBlue.withValues(alpha: 0.45)
-                  : Theme.of(context).dividerColor,
+                  : _AiPalette.line(context),
             ),
           ),
           child: Row(
@@ -1116,13 +1587,16 @@ class _PresetTile extends StatelessWidget {
                   children: [
                     Text(
                       preset.name,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: _AiPalette.text(context),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${preset.provider.label} · ${preset.tag}',
                       style: TextStyle(
-                        color: AppTheme.textSecondary,
+                        color: _AiPalette.muted(context),
                         fontSize: 12,
                       ),
                     ),
@@ -1166,9 +1640,9 @@ class _PresetLogo extends StatelessWidget {
         Color(0xFF13A9A0),
       ),
       AiProvider.custom => const _LogoStyle(
-        'Q',
-        Color(0xFFF1EFFF),
-        Color(0xFF6A5CE7),
+        '网',
+        Color(0xFFF0ECFF),
+        Color(0xFF7A67F2),
       ),
     };
     return Container(
@@ -1177,7 +1651,7 @@ class _PresetLogo extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: style.background,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         style.letter,
@@ -1187,41 +1661,78 @@ class _PresetLogo extends StatelessWidget {
   }
 }
 
-class _TextFieldShell extends StatelessWidget {
+class _TextFieldShell extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
   final ValueChanged<String> onChanged;
   final bool mono;
+  final bool secret;
 
   const _TextFieldShell({
     required this.controller,
     required this.hintText,
     required this.onChanged,
     this.mono = false,
+    this.secret = false,
   });
+
+  @override
+  State<_TextFieldShell> createState() => _TextFieldShellState();
+}
+
+class _TextFieldShellState extends State<_TextFieldShell> {
+  bool _obscured = true;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller: controller,
-      onChanged: onChanged,
+      controller: widget.controller,
+      onChanged: widget.onChanged,
+      obscureText: widget.secret && _obscured,
+      obscuringCharacter: '•',
+      enableSuggestions: !widget.secret,
+      autocorrect: false,
       style: TextStyle(
-        fontFamily: mono ? 'monospace' : null,
+        color: _AiPalette.text(context),
+        fontFamily: widget.mono ? 'monospace' : null,
         fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
-        hintText: hintText,
+        hintText: widget.hintText,
         isDense: true,
         filled: true,
-        fillColor: Theme.of(context).colorScheme.surface,
+        fillColor: _AiPalette.field(context),
+        hintStyle: TextStyle(
+          color: _AiPalette.subtle(context),
+          fontWeight: FontWeight.w600,
+        ),
+        suffixIcon: widget.secret
+            ? IconButton(
+                tooltip: _obscured ? '显示' : '隐藏',
+                onPressed: () => setState(() => _obscured = !_obscured),
+                icon: Icon(
+                  _obscured
+                      ? Icons.visibility_off_rounded
+                      : Icons.visibility_rounded,
+                  size: 18,
+                ),
+                color: _AiPalette.subtle(context),
+              )
+            : null,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: _AiPalette.line(context)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: _AiPalette.line(context)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: AppTheme.primaryBlue.withValues(alpha: 0.72),
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 12,
@@ -1247,16 +1758,16 @@ class _SmallSegment extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: active
-              ? Theme.of(context).colorScheme.surface
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+              ? _AiPalette.controlActive(context)
+              : _AiPalette.control(context),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
-            color: active ? AppTheme.primaryBlue : AppTheme.textSecondary,
+            color: active ? AppTheme.primaryBlue : _AiPalette.muted(context),
           ),
         ),
       ),
@@ -1280,22 +1791,22 @@ class _ValidationRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF6DB),
+              color: _AiPalette.warningBg(context),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.priority_high_rounded,
                   size: 13,
-                  color: Color(0xFFD99A00),
+                  color: _AiPalette.warning(context),
                 ),
                 const SizedBox(width: 3),
                 Text(
                   message,
-                  style: const TextStyle(
-                    color: Color(0xFF8B6508),
+                  style: TextStyle(
+                    color: _AiPalette.warningText(context),
                     fontWeight: FontWeight.w700,
                     fontSize: 11,
                   ),

@@ -9,6 +9,7 @@ import '../../providers/item_providers.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_format.dart';
 import 'move_target_sheet.dart';
+import 'smooth_dialog.dart';
 import 'when_picker_sheet.dart';
 
 /// 「一句话拆解捕获」的草稿评审框。
@@ -22,7 +23,7 @@ class CaptureReviewSheet {
     String? contextProjectId,
     String? headingId,
   }) {
-    return showDialog<bool>(
+    return showSmoothDialog<bool>(
       context: context,
       barrierDismissible: true,
       builder: (_) => _CaptureReviewBody(
@@ -41,8 +42,8 @@ class _ChildEdit {
   WhenChoice when;
   DateTime? deadline;
   _ChildEdit(String t, {WhenChoice? when, this.deadline})
-      : title = TextEditingController(text: t),
-        when = when ?? WhenChoice.inbox;
+    : title = TextEditingController(text: t),
+      when = when ?? WhenChoice.inbox;
 }
 
 /// 顶层条目的可编辑状态。
@@ -65,10 +66,10 @@ class _ItemEdit {
     Set<String>? tagIds,
     List<String>? newTagNames,
     List<_ChildEdit>? children,
-  })  : title = TextEditingController(text: title),
-        tagIds = tagIds ?? {},
-        newTagNames = newTagNames ?? [],
-        children = children ?? [];
+  }) : title = TextEditingController(text: title),
+       tagIds = tagIds ?? {},
+       newTagNames = newTagNames ?? [],
+       children = children ?? [];
 }
 
 class _CaptureReviewBody extends ConsumerStatefulWidget {
@@ -111,26 +112,33 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
       final newNames = <String>[];
       for (final name in d.tagNames) {
         final match = tags.where(
-            (t) => t.title.toLowerCase() == name.toLowerCase());
+          (t) => t.title.toLowerCase() == name.toLowerCase(),
+        );
         if (match.isNotEmpty) {
           existingIds.add(match.first.id);
         } else {
           newNames.add(name);
         }
       }
-      _items.add(_ItemEdit(
-        title: d.title,
-        type: d.type,
-        when: _toWhenChoice(d.when),
-        deadline: d.deadline,
-        list: resolveList(d.listName),
-        tagIds: existingIds,
-        newTagNames: newNames,
-        children: [
-          for (final c in d.children)
-            _ChildEdit(c.title, when: _toWhenChoice(c.when), deadline: c.deadline),
-        ],
-      ));
+      _items.add(
+        _ItemEdit(
+          title: d.title,
+          type: d.type,
+          when: _toWhenChoice(d.when),
+          deadline: d.deadline,
+          list: resolveList(d.listName),
+          tagIds: existingIds,
+          newTagNames: newNames,
+          children: [
+            for (final c in d.children)
+              _ChildEdit(
+                c.title,
+                when: _toWhenChoice(c.when),
+                deadline: c.deadline,
+              ),
+          ],
+        ),
+      );
     }
   }
 
@@ -243,12 +251,14 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
           );
           created.add(pid);
           if (it.when.startDate != null || it.when.start == WhenStart.someday) {
-            await repo.setWhen(pid,
-                start: it.when.start == WhenStart.inbox
-                    ? WhenStart.anytime
-                    : it.when.start,
-                startDate: it.when.startDate,
-                evening: it.when.evening);
+            await repo.setWhen(
+              pid,
+              start: it.when.start == WhenStart.inbox
+                  ? WhenStart.anytime
+                  : it.when.start,
+              startDate: it.when.startDate,
+              evening: it.when.evening,
+            );
           }
           if (it.deadline != null) await repo.setDeadline(pid, it.deadline);
           for (final tagId in tagIds) {
@@ -295,8 +305,9 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('保存失败：$e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
       return;
     }
 
@@ -304,18 +315,20 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
     Navigator.of(context).pop(true);
     final messenger = ScaffoldMessenger.of(context);
     messenger.clearSnackBars();
-    messenger.showSnackBar(SnackBar(
-      content: Text('已添加 ${created.length} 个条目'),
-      duration: const Duration(seconds: 5),
-      action: SnackBarAction(
-        label: '撤销',
-        onPressed: () async {
-          for (final id in created) {
-            await repo.moveToTrash(id);
-          }
-        },
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('已添加 ${created.length} 个条目'),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: '撤销',
+          onPressed: () async {
+            for (final id in created) {
+              await repo.moveToTrash(id);
+            }
+          },
+        ),
       ),
-    ));
+    );
   }
 
   // ----------------------------------------------------------------
@@ -327,7 +340,10 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
     if (c != null) setState(() => set(c));
   }
 
-  Future<void> _editDeadline(DateTime? current, void Function(DateTime?) set) async {
+  Future<void> _editDeadline(
+    DateTime? current,
+    void Function(DateTime?) set,
+  ) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -352,7 +368,7 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
     final mq = MediaQuery.of(context);
     final maxH = math.min(620.0, mq.size.height * 0.86);
     final tagTitleById = {
-      for (final t in ref.watch(tagsProvider).value ?? <Tag>[]) t.id: t.title
+      for (final t in ref.watch(tagsProvider).value ?? <Tag>[]) t.id: t.title,
     };
 
     return Dialog(
@@ -371,12 +387,16 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
               padding: const EdgeInsets.fromLTRB(22, 18, 18, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded,
-                      size: 18, color: AppTheme.primaryBlue),
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 18,
+                    color: AppTheme.primaryBlue,
+                  ),
                   const SizedBox(width: 8),
-                  const Text('已拆解',
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 15)),
+                  const Text(
+                    '已拆解',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
                   const Spacer(),
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(false),
@@ -392,7 +412,10 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                    fontSize: 12.5, color: AppTheme.textSecondary, height: 1.4),
+                  fontSize: 12.5,
+                  color: AppTheme.textSecondary,
+                  height: 1.4,
+                ),
               ),
             ),
             const Divider(height: 16),
@@ -415,9 +438,13 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
               child: Row(
                 children: [
-                  Text('共 $_totalCount 项',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary, fontSize: 13)),
+                  Text(
+                    '共 $_totalCount 项',
+                    style: TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
                   const Spacer(),
                   FilledButton(
                     onPressed: _saving || _totalCount == 0 ? null : _commit,
@@ -430,7 +457,9 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : Text('保存 $_totalCount 项'),
                   ),
@@ -469,7 +498,9 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
                 child: TextField(
                   controller: it.title,
                   style: const TextStyle(
-                      fontSize: 15.5, fontWeight: FontWeight.w600),
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w600,
+                  ),
                   decoration: const InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
@@ -505,7 +536,8 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
                       ? '死线'
                       : DateFmt.deadlineLabel(it.deadline!),
                   active: it.deadline != null,
-                  onTap: () => _editDeadline(it.deadline, (d) => it.deadline = d),
+                  onTap: () =>
+                      _editDeadline(it.deadline, (d) => it.deadline = d),
                   onClear: it.deadline != null
                       ? () => setState(() => it.deadline = null)
                       : null,
@@ -543,9 +575,10 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
               child: Text(
                 it.type == ItemType.project ? '项目下的任务' : '检查项',
                 style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textSecondary),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textSecondary,
+                ),
               ),
             ),
             for (final c in it.children) _childRow(it, c),
@@ -558,8 +591,9 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
   Widget _typeToggle(_ItemEdit it) {
     return GestureDetector(
       onTap: () => setState(() {
-        it.type =
-            it.type == ItemType.project ? ItemType.task : ItemType.project;
+        it.type = it.type == ItemType.project
+            ? ItemType.task
+            : ItemType.project;
       }),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -570,9 +604,10 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
         child: Text(
           it.type == ItemType.project ? '项目' : '任务',
           style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.primaryBlue),
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.primaryBlue,
+          ),
         ),
       ),
     );
@@ -600,8 +635,7 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
               style: TextStyle(
                 fontSize: 14,
                 color: c.include ? null : AppTheme.textSecondary,
-                decoration:
-                    c.include ? null : TextDecoration.lineThrough,
+                decoration: c.include ? null : TextDecoration.lineThrough,
               ),
               decoration: const InputDecoration(
                 isDense: true,
@@ -646,9 +680,14 @@ class _CaptureReviewBodyState extends ConsumerState<_CaptureReviewBody> {
           children: [
             Icon(icon, size: 14, color: c),
             const SizedBox(width: 5),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12.5, color: c, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: c,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             if (onClear != null) ...[
               const SizedBox(width: 4),
               GestureDetector(

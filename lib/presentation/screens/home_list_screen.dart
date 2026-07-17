@@ -21,14 +21,15 @@ class HomeListScreen extends ConsumerWidget {
   const HomeListScreen({super.key});
 
   void _openView(BuildContext context, AppView view) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => ViewScreen(view: view, showBack: true),
-    ));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ViewScreen(view: view, showBack: true)),
+    );
   }
 
   void _openSearch(BuildContext context) {
-    Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const SearchScreen()));
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
   }
 
   @override
@@ -45,100 +46,131 @@ class HomeListScreen extends ConsumerWidget {
             onPressed: () => _openSearch(context),
           ),
           IconButton(
-            icon: Icon(Icons.fact_check_outlined, color: AppTheme.textSecondary),
+            icon: Icon(
+              Icons.fact_check_outlined,
+              color: AppTheme.textSecondary,
+            ),
             tooltip: '一键回顾',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const ReviewReportScreen())),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ReviewReportScreen()),
+            ),
           ),
           IconButton(
-            icon: Icon(Icons.auto_awesome_outlined,
-                color: AppTheme.textSecondary),
+            icon: Icon(
+              Icons.auto_awesome_outlined,
+              color: AppTheme.textSecondary,
+            ),
             tooltip: 'AI 模型',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const AiSettingsScreen())),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const AiSettingsScreen())),
           ),
           IconButton(
-            icon: Icon(Icons.cloud_sync_outlined, color: AppTheme.textSecondary),
+            icon: Icon(
+              Icons.cloud_sync_outlined,
+              color: AppTheme.textSecondary,
+            ),
             tooltip: '云同步',
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const SyncSettingsScreen())),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SyncSettingsScreen()),
+            ),
           ),
         ],
       ),
       body: MagicCreateScope(
         context: const MagicCreateContext(defaultWhen: WhenChoice.inbox),
         child: SafeArea(
-        child: NotificationListener<OverscrollNotification>(
-          // Things 式「下拉弹出搜索」：在顶部继续下拉即打开 Quick Find。
-          onNotification: (n) {
-            if (n.overscroll < -8 && n.metrics.pixels <= 0) {
-              _openSearch(context);
-              return true;
-            }
-            return false;
-          },
-          child: ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: [
-            for (final v in AppView.values)
-              _ViewTile(view: v, onTap: () => _openView(context, v)),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, 6),
-              child: Divider(),
-            ),
-            for (final area in areas) ...[
-              GestureDetector(
-                onLongPress: () => TagPickerSheet.show(context, area.id),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  child: Text(area.title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textSecondary)),
+          child: NotificationListener<OverscrollNotification>(
+            // Things 式「下拉弹出搜索」：在顶部继续下拉即打开 Quick Find。
+            onNotification: (n) {
+              if (n.overscroll < -8 && n.metrics.pixels <= 0) {
+                _openSearch(context);
+                return true;
+              }
+              return false;
+            },
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                for (final v in AppView.values)
+                  _ViewTile(view: v, onTap: () => _openView(context, v)),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 6),
+                  child: Divider(),
                 ),
-              ),
-              for (final p in projects.where((p) => p.areaId == area.id))
-                _ProjectTile(id: p.id, title: p.title),
-            ],
-            for (final p in projects.where((p) => p.areaId == null))
-              _ProjectTile(id: p.id, title: p.title),
-            _addTile(context, ref, '新建项目', isArea: false),
-            _addTile(context, ref, '新建领域', isArea: true),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: Divider(),
+                for (final area in areas) ...[
+                  GestureDetector(
+                    onLongPress: () => TagPickerSheet.show(context, area.id),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                      child: Text(
+                        area.title,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  for (final p in projects.where((p) => p.areaId == area.id))
+                    _ProjectTile(id: p.id, title: p.title),
+                ],
+                for (final p in projects.where((p) => p.areaId == null))
+                  _ProjectTile(id: p.id, title: p.title),
+                _addTile(context, ref, '新建项目', isArea: false),
+                _addTile(context, ref, '新建领域', isArea: true),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 4),
+                  child: Divider(),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline,
+                    color: AppTheme.textSecondary,
+                  ),
+                  title: Text(
+                    '垃圾桶',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TrashScreen()),
+                  ),
+                ),
+              ],
             ),
-            ListTile(
-              leading: Icon(Icons.delete_outline,
-                  color: AppTheme.textSecondary),
-              title: Text('垃圾桶',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(color: AppTheme.textSecondary)),
-              onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const TrashScreen())),
-            ),
-            ],
           ),
-        ),
         ),
       ),
     );
   }
 
-  Widget _addTile(BuildContext context, WidgetRef ref, String label,
-      {required bool isArea}) {
+  Widget _addTile(
+    BuildContext context,
+    WidgetRef ref,
+    String label, {
+    required bool isArea,
+  }) {
     return ListTile(
-      leading: Icon(Icons.add, color: AppTheme.textSecondary),
-      title: Text(label,
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(color: AppTheme.textSecondary)),
+      dense: true,
+      visualDensity: const VisualDensity(vertical: -1),
+      minLeadingWidth: 30,
+      leading: Icon(Icons.add, size: 20, color: AppTheme.textSecondary),
+      title: Text(
+        label,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: AppTheme.textSecondary,
+          fontSize: 14.5,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
       onTap: () async {
-        final name = await NameDialog.show(context,
-            title: label, hint: isArea ? '领域名称' : '项目名称');
+        final name = await NameDialog.show(
+          context,
+          title: label,
+          hint: isArea ? '领域名称' : '项目名称',
+        );
         if (name != null && name.isNotEmpty) {
           final repo = ref.read(itemRepositoryProvider);
           if (isArea) {
@@ -175,17 +207,20 @@ class _ViewTile extends ConsumerWidget {
         ),
         child: Icon(view.icon, color: Colors.white, size: 18),
       ),
-      title: Text(view.title,
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(fontWeight: FontWeight.w500)),
+      title: Text(
+        view.title,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      ),
       trailing: (count > 0 && view != AppView.logbook)
-          ? Text('$count',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: AppTheme.textSecondary, fontSize: 15))
+          ? Text(
+              '$count',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondary,
+                fontSize: 15,
+              ),
+            )
           : null,
       onTap: onTap,
     );
@@ -207,18 +242,24 @@ class _ProjectTile extends ConsumerWidget {
       minLeadingWidth: 26,
       horizontalTitleGap: 14,
       leading: ProgressPie(
-        progress: progress.maybeWhen(data: (p) => p.fraction, orElse: () => 0.0),
+        progress: progress.maybeWhen(
+          data: (p) => p.fraction,
+          orElse: () => 0.0,
+        ),
         size: 18,
         color: AppTheme.primaryBlue,
       ),
-      title: Text(title,
-          style: Theme.of(context)
-              .textTheme
-              .bodyLarge
-              ?.copyWith(fontWeight: FontWeight.w500)),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ProjectScreen(projectId: id, projectTitle: title),
-      )),
+      title: Text(
+        title,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      ),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ProjectScreen(projectId: id, projectTitle: title),
+        ),
+      ),
     );
   }
 }

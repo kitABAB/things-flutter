@@ -43,12 +43,13 @@ class _DeepLinkHostState extends ConsumerState<DeepLinkHost> {
         uri.host == 'capture' || uri.pathSegments.contains('capture');
     if (isCapture) {
       if (!mounted) return;
-      await AddEditItemModal.show(context, defaultWhen: WhenChoice.today);
+      await AddEditItemModal.pushCreate(context, defaultWhen: WhenChoice.today);
       return;
     }
 
     // 兼容 things://add 与 things:///add 两种写法。
-    final isAdd = uri.host == 'add' ||
+    final isAdd =
+        uri.host == 'add' ||
         uri.pathSegments.contains('add') ||
         uri.path == '/add';
     if (!isAdd) return;
@@ -56,14 +57,11 @@ class _DeepLinkHostState extends ConsumerState<DeepLinkHost> {
     if (title == null || title.isEmpty) return;
 
     final repo = ref.read(itemRepositoryProvider);
-    await repo.createTask(
-      title: title,
-      start: WhenStart.inbox,
-    );
+    await repo.createTask(title: title, start: WhenStart.inbox);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已捕获到收件箱：$title')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('已捕获到收件箱：$title')));
   }
 
   @override

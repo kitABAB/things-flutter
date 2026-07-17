@@ -15,10 +15,10 @@ class SidebarSelection {
   final String? projectId;
   final String? projectTitle;
   const SidebarSelection.system(this.view)
-      : projectId = null,
-        projectTitle = null;
+    : projectId = null,
+      projectTitle = null;
   const SidebarSelection.project(this.projectId, this.projectTitle)
-      : view = null;
+    : view = null;
 
   bool get isProject => projectId != null;
 }
@@ -39,15 +39,21 @@ class ThingsSidebar extends ConsumerWidget {
     final projects = ref.watch(projectsProvider).value ?? [];
 
     return Container(
-      width: 240,
-      color: AppTheme.sidebarBg,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppTheme.sidebarBg,
+        border: Border(right: BorderSide(color: AppTheme.dividerColor)),
+      ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
           children: [
+            _sidebarHeader(context, ref),
+            const SizedBox(height: 14),
             _actionRow(context, Icons.search, '搜索', () {
-              Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const SearchScreen()));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const SearchScreen()));
             }),
             const SizedBox(height: 4),
             for (final v in AppView.values) _navItem(context, ref, v),
@@ -62,16 +68,23 @@ class ThingsSidebar extends ConsumerWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(area.title,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textSecondary)),
+                      child: Text(
+                        area.title,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
                     ),
                     InkWell(
                       onTap: () => _newProject(context, ref, areaId: area.id),
                       child: Padding(
                         padding: const EdgeInsets.all(4),
-                        child: Icon(Icons.add, size: 16, color: AppTheme.textSecondary),
+                        child: Icon(
+                          Icons.add,
+                          size: 16,
+                          color: AppTheme.textSecondary,
+                        ),
                       ),
                     ),
                   ],
@@ -87,12 +100,14 @@ class ThingsSidebar extends ConsumerWidget {
             _addRow(context, '新建领域', () => _newArea(context, ref)),
             const Divider(height: 16),
             _actionRow(context, Icons.delete_outline, '垃圾桶', () {
-              Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const TrashScreen()));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const TrashScreen()));
             }),
             _actionRow(context, Icons.auto_awesome_outlined, 'AI 模型', () {
               Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AiSettingsScreen()));
+                MaterialPageRoute(builder: (_) => const AiSettingsScreen()),
+              );
             }),
           ],
         ),
@@ -100,11 +115,56 @@ class ThingsSidebar extends ConsumerWidget {
     );
   }
 
-  Future<void> _newProject(BuildContext context, WidgetRef ref,
-      {String? areaId}) async {
+  Widget _sidebarHeader(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryBlue.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              color: AppTheme.primaryBlue,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Things',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '新建项目',
+            icon: const Icon(Icons.add_rounded, size: 20),
+            onPressed: () => _newProject(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _newProject(
+    BuildContext context,
+    WidgetRef ref, {
+    String? areaId,
+  }) async {
     final name = await NameDialog.show(context, title: '新建项目', hint: '项目名称');
     if (name != null && name.isNotEmpty) {
-      ref.read(itemRepositoryProvider).createProject(title: name, areaId: areaId);
+      ref
+          .read(itemRepositoryProvider)
+          .createProject(title: name, areaId: areaId);
     }
   }
 
@@ -116,19 +176,27 @@ class ThingsSidebar extends ConsumerWidget {
   }
 
   Widget _actionRow(
-      BuildContext context, IconData icon, String label, VoidCallback onTap) {
+    BuildContext context,
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+  ) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppTheme.textSecondary),
+            Icon(icon, size: 18, color: AppTheme.textSecondary),
             const SizedBox(width: 12),
-            Text(label,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontSize: 15, color: AppTheme.textSecondary)),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
           ],
         ),
       ),
@@ -145,11 +213,12 @@ class ThingsSidebar extends ConsumerWidget {
           children: [
             Icon(Icons.add, size: 18, color: AppTheme.textSecondary),
             const SizedBox(width: 12),
-            Text(label,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppTheme.textSecondary)),
+            Text(
+              label,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
+            ),
           ],
         ),
       ),
@@ -171,21 +240,25 @@ class ThingsSidebar extends ConsumerWidget {
 
   Widget _projectItem(BuildContext context, String id, String title) {
     final selected = selection.projectId == id;
-    return Consumer(builder: (context, ref, _) {
-      final progress = ref.watch(projectProgressProvider(id));
-      return _tile(
-        context,
-        selected: selected,
-        leading: ProgressPie(
-          progress:
-              progress.maybeWhen(data: (p) => p.fraction, orElse: () => 0.0),
-          size: 18,
-          color: AppTheme.primaryBlue,
-        ),
-        label: title,
-        onTap: () => onSelect(SidebarSelection.project(id, title)),
-      );
-    });
+    return Consumer(
+      builder: (context, ref, _) {
+        final progress = ref.watch(projectProgressProvider(id));
+        return _tile(
+          context,
+          selected: selected,
+          leading: ProgressPie(
+            progress: progress.maybeWhen(
+              data: (p) => p.fraction,
+              orElse: () => 0.0,
+            ),
+            size: 18,
+            color: AppTheme.primaryBlue,
+          ),
+          label: title,
+          onTap: () => onSelect(SidebarSelection.project(id, title)),
+        );
+      },
+    );
   }
 
   Widget _tile(
@@ -199,11 +272,15 @@ class ThingsSidebar extends ConsumerWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 130),
+        curve: Curves.easeOutCubic,
         margin: const EdgeInsets.symmetric(vertical: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
-          color: selected ? Colors.black.withValues(alpha: 0.06) : null,
+          color: selected
+              ? AppTheme.primaryBlue.withValues(alpha: 0.09)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -211,20 +288,23 @@ class ThingsSidebar extends ConsumerWidget {
             leading,
             const SizedBox(width: 12),
             Expanded(
-              child: Text(label,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontSize: 15,
-                      color: AppTheme.textPrimary,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w400)),
+              child: Text(
+                label,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontSize: 15,
+                  color: AppTheme.textPrimary,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
             ),
             if (trailing != null)
-              Text(trailing,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: AppTheme.textSecondary)),
+              Text(
+                trailing,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppTheme.textSecondary),
+              ),
           ],
         ),
       ),
