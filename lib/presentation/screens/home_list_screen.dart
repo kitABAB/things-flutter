@@ -13,7 +13,7 @@ import 'project_screen.dart';
 import 'search_screen.dart';
 import 'trash_screen.dart';
 import 'sync_settings_screen.dart';
-import 'ai_settings_screen.dart';
+import 'ai_conversation_capture_screen.dart';
 import 'review_report_screen.dart';
 
 /// 移动端主页：Things 风格的清单导航（系统视图 + 领域/项目）。
@@ -60,10 +60,15 @@ class HomeListScreen extends ConsumerWidget {
               Icons.auto_awesome_outlined,
               color: AppTheme.textSecondary,
             ),
-            tooltip: 'AI 模型',
-            onPressed: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const AiSettingsScreen())),
+            tooltip: 'AI 理清',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                settings: const RouteSettings(
+                  name: MagicPlusNavObserver.hidePlusRouteName,
+                ),
+                builder: (_) => const AiConversationCaptureScreen(),
+              ),
+            ),
           ),
           IconButton(
             icon: Icon(

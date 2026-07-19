@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'agent/capture_agent.dart';
 import 'capture/capture_parser.dart';
 import 'clarify/clarify_service.dart';
 import 'config/ai_config.dart';
@@ -136,6 +137,11 @@ final captureParserProvider = Provider<CaptureParser>((ref) {
   return CaptureParser(ref.watch(llmClientProvider));
 });
 
+/// 对话式捕获 Agent：带 GTD skill、工具协议和待创建工作区。
+final captureAgentProvider = Provider<CaptureAgent>((ref) {
+  return CaptureAgent(ref.watch(llmClientProvider));
+});
+
 /// 「AI 理清」教练（单条 + 批量复用）。
 final clarifyServiceProvider = Provider<ClarifyService>((ref) {
   return ClarifyService(ref.watch(llmClientProvider));
@@ -164,7 +170,7 @@ class _FallbackLlmClient implements LlmClient {
     List<LlmMessage> messages, {
     bool jsonMode = false,
     double temperature = 0.2,
-    Duration timeout = const Duration(seconds: 20),
+    Duration timeout = const Duration(seconds: 45),
   }) async {
     if (!isConfigured) {
       throw const LlmException.notConfigured();

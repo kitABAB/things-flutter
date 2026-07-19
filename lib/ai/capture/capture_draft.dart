@@ -4,6 +4,8 @@ import '../../domain/models/item.dart';
 /// 保持 ai 层不依赖 presentation 层（依赖方向单向：presentation -> ai）。
 enum DraftWhenKind { none, today, evening, someday, date }
 
+enum DraftListKind { newArea, newProject }
+
 class DraftWhen {
   final DraftWhenKind kind;
   final DateTime? date; // 仅 kind == date 时有效
@@ -46,6 +48,10 @@ class DraftItem {
   /// AI 建议放入的清单名：null=沿用语境，'__inbox__'=收件箱，否则是项目/领域名。
   String? listName;
 
+  /// 当 [listName] 不匹配已有项目/领域时，是否建议确认时新建容器。
+  /// null 表示已有容器或不确定；不确定时 UI 继续保守放入收件箱/当前项目。
+  DraftListKind? listKind;
+
   /// 子条目（项目→任务 / 任务→检查项）。
   List<DraftChild> children;
 
@@ -56,9 +62,10 @@ class DraftItem {
     this.deadline,
     List<String>? tagNames,
     this.listName,
+    this.listKind,
     List<DraftChild>? children,
-  })  : tagNames = tagNames ?? [],
-        children = children ?? [];
+  }) : tagNames = tagNames ?? [],
+       children = children ?? [];
 
   static const inboxToken = '__inbox__';
 }

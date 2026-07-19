@@ -1,9 +1,7 @@
-import 'dart:convert';
-
-import '../../domain/models/item.dart';
 import '../core/llm_client.dart';
 import '../core/llm_message.dart';
 import 'capture_draft.dart';
+import 'capture_draft_codec.dart';
 
 /// 解析时提供给模型的语境：当前日期 + 已有的项目/领域/标签名，
 /// 让模型尽量把条目挂到「已存在」的清单与标签上，而不是凭空造新名字。
@@ -36,15 +34,12 @@ class CaptureParser {
       return CaptureDraft(source: input, items: []);
     }
 
-    final reply = await client.complete(
-      [
-        LlmMessage.system(_systemPrompt(ctx)),
-        LlmMessage.user(raw),
-      ],
-      jsonMode: true,
-    );
+    final reply = await client.complete([
+      LlmMessage.system(_systemPrompt(ctx)),
+      LlmMessage.user(raw),
+    ], jsonMode: true);
 
-    return _decode(reply, raw);
+    return CaptureDraftCodec.decodeReply(reply, raw);
   }
 
   // ----------------------------------------------------------------
@@ -54,7 +49,9 @@ class CaptureParser {
   String _systemPrompt(CaptureContext ctx) {
     final today = _ymd(ctx.now);
     final weekday = ['一', '二', '三', '四', '五', '六', '日'][ctx.now.weekday - 1];
-    final projects = ctx.projectNames.isEmpty ? '（无）' : ctx.projectNames.join('、');
+    final projects = ctx.projectNames.isEmpty
+        ? '（无）'
+        : ctx.projectNames.join('、');
     final areas = ctx.areaNames.isEmpty ? '（无）' : ctx.areaNames.join('、');
     final tags = ctx.tagNames.isEmpty ? '（无）' : ctx.tagNames.join('、');
 
@@ -92,122 +89,6 @@ class CaptureParser {
 - 不确定的字段一律用 none / null / 空数组，绝不编造日期。
 - 通常只产出 1 个顶层 item；只有输入里确实包含多件独立的事时才产出多个。
 ''';
-  }
-
-  // ----------------------------------------------------------------
-  // 解析模型输出
-  // ----------------------------------------------------------------
-
-  CaptureDraft _decode(String reply, String source) {
-    final jsonStr = _extractJson(reply);
-    if (jsonStr == null) {
-      // 兜底：模型没给出可用 JSON，则退化为单条任务。
-      return CaptureDraft(
-        source: source,
-        items: [DraftItem(title: source)],
-      );
-    }
-
-    Map<String, dynamic> map;
-    try {
-      map = jsonDecode(jsonStr) as Map<String, dynamic>;
-    } catch (_) {
-      return CaptureDraft(source: source, items: [DraftItem(title: source)]);
-    }
-
-    final rawItems = map['items'];
-    if (rawItems is! List || rawItems.isEmpty) {
-      return CaptureDraft(source: source, items: [DraftItem(title: source)]);
-    }
-
-    final items = <DraftItem>[];
-    for (final r in rawItems) {
-      if (r is! Map) continue;
-      final item = _decodeItem(r);
-      if (item != null) items.add(item);
-    }
-    if (items.isEmpty) items.add(DraftItem(title: source));
-    return CaptureDraft(source: source, items: items);
-  }
-
-  DraftItem? _decodeItem(Map raw) {
-    final title = (raw['title'] as String?)?.trim();
-    if (title == null || title.isEmpty) return null;
-
-    final type = (raw['type'] == 'project') ? ItemType.project : ItemType.task;
-
-    final tags = <String>[];
-    if (raw['tags'] is List) {
-      for (final t in raw['tags']) {
-        if (t is String && t.trim().isNotEmpty) tags.add(t.trim());
-      }
-    }
-
-    String? listName;
-    final list = raw['list'];
-    if (list is String && list.trim().isNotEmpty && list != 'null') {
-      listName = list.trim().toLowerCase() == 'inbox'
-          ? DraftItem.inboxToken
-          : list.trim();
-    }
-
-    final children = <DraftChild>[];
-    if (raw['children'] is List) {
-      for (final c in raw['children']) {
-        if (c is String && c.trim().isNotEmpty) {
-          children.add(DraftChild(title: c.trim()));
-        } else if (c is Map && c['title'] is String) {
-          children.add(DraftChild(
-            title: (c['title'] as String).trim(),
-            when: _decodeWhen(c['when']),
-            deadline: _decodeDate(c['deadline']),
-          ));
-        }
-      }
-    }
-
-    return DraftItem(
-      title: title,
-      type: type,
-      when: _decodeWhen(raw['when']),
-      deadline: _decodeDate(raw['deadline']),
-      tagNames: tags,
-      listName: listName,
-      children: children,
-    );
-  }
-
-  DraftWhen _decodeWhen(Object? raw) {
-    if (raw is! String) return DraftWhen.none;
-    switch (raw) {
-      case 'today':
-        return const DraftWhen(DraftWhenKind.today);
-      case 'evening':
-        return const DraftWhen(DraftWhenKind.evening);
-      case 'someday':
-        return const DraftWhen(DraftWhenKind.someday);
-      case 'none':
-      case '':
-        return DraftWhen.none;
-      default:
-        final d = _decodeDate(raw);
-        return d == null ? DraftWhen.none : DraftWhen(DraftWhenKind.date, date: d);
-    }
-  }
-
-  DateTime? _decodeDate(Object? raw) {
-    if (raw is! String || raw.isEmpty || raw == 'null') return null;
-    final d = DateTime.tryParse(raw);
-    if (d == null) return null;
-    return DateTime(d.year, d.month, d.day);
-  }
-
-  /// 从模型回复里抠出第一段完整 JSON（容忍前后多余文字 / 代码围栏）。
-  String? _extractJson(String reply) {
-    final start = reply.indexOf('{');
-    final end = reply.lastIndexOf('}');
-    if (start == -1 || end == -1 || end <= start) return null;
-    return reply.substring(start, end + 1);
   }
 
   static String _ymd(DateTime d) {

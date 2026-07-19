@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 对话式捕获 · 高保真</title>
+<style>
+  :root{
+    --blue:#2D7DF6;
+    --green:#30D158;
+    --amber:#FFD166;
+    --red:#FF5C5C;
+    --violet:#7C6DFF;
+    --teal:#22C7B8;
+    --bg:#0B0C10;
+    --panel:#16171D;
+    --panel2:#202128;
+    --panel3:#292B34;
+    --text:#F4F5F7;
+    --muted:#9A9DA8;
+    --faint:#666A76;
+    --line:#2C2E37;
+    --chip:#2A2D38;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    background:
+      radial-gradient(860px 520px at 10% -10%,rgba(45,125,246,.30),transparent 62%),
+      radial-gradient(780px 500px at 86% 6%,rgba(124,109,255,.28),transparent 60%),
+      linear-gradient(180deg,#0D1018 0%,#08090D 100%);
+    color:var(--text);
+    padding:34px 28px 64px;
+  }
+  button,input,textarea{font:inherit}
+  .hero{
+    max-width:1180px;
+    margin:0 auto 28px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:24px;
+  }
+  .hero h1{font-size:26px;line-height:1.15;font-weight:860;letter-spacing:0}
+  .hero p{margin-top:10px;max-width:720px;color:#B9BDCA;font-size:13.5px;line-height:1.7}
+  .hero b{color:#fff}
+  .tagline{
+    flex:none;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  .tag{
+    border:1px solid rgba(255,255,255,.09);
+    background:rgba(255,255,255,.055);
+    color:#D9DCEF;
+    border-radius:999px;
+    padding:8px 12px;
+    font-size:12px;
+    font-weight:760;
+  }
+  .board{
+    max-width:1400px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns:repeat(4, minmax(282px,1fr));
+    gap:22px;
+    align-items:start;
+  }
+  .frame-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .caption{
+    width:100%;
+    max-width:330px;
+    min-height:70px;
+    padding:0 6px;
+  }
+  .caption .k{font-size:13px;font-weight:850;color:#fff}
+  .caption .v{font-size:12px;color:#AEB3C2;line-height:1.55;margin-top:5px}
+  .phone-shell{
+    width:330px;
+    padding:12px;
+    border-radius:46px;
+    background:linear-gradient(145deg,#DCE8F8 0%,#B9B8C9 50%,#EFE1C8 100%);
+    box-shadow:0 30px 76px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.52);
+  }
+  .phone{
+    height:700px;
+    border-radius:34px;
+    overflow:hidden;
+    position:relative;
+    background:#121317;
+    display:flex;
+    flex-direction:column;
+  }
+  .status{
+    height:37px;
+    padding:13px 22px 4px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:12px;
+    font-weight:800;
+    color:#F3F4F6;
+    flex:none;
+  }
+  .sys{display:flex;align-items:center;gap:5px}
+  .sig{width:17px;height:11px;border:2px solid #F3F4F6;border-radius:3px;position:relative}
+  .sig:after{content:"";position:absolute;right:-5px;top:2px;width:3px;height:5px;background:#F3F4F6;border-radius:0 2px 2px 0}
+  .wifi{width:16px;height:16px;border:2px solid #F3F4F6;border-left:0;border-bottom:0;transform:rotate(-45deg);border-radius:2px}
+  .nav{
+    min-height:58px;
+    display:flex;
+    align-items:center;
+    gap:9px;
+    padding:8px 18px 10px;
+    flex:none;
+  }
+  .nav h2{font-size:24px;font-weight:880;letter-spacing:0;line-height:1}
+  .nav .sub{font-size:11.5px;color:var(--muted);font-weight:700;margin-top:4px}
+  .spacer{flex:1}
+  .icon{
+    width:38px;height:38px;border:0;border-radius:15px;
+    background:#232630;color:#D9DCEF;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .icon svg{width:20px;height:20px}
+  .icon.ai{
+    background:linear-gradient(135deg,#2D7DF6,#7C6DFF);
+    color:#fff;
+    box-shadow:0 12px 30px rgba(45,125,246,.30);
+  }
+  .screen{
+    flex:1;
+    overflow:hidden;
+    padding:4px 18px 16px;
+    position:relative;
+  }
+  .home-list{display:flex;flex-direction:column;gap:14px;padding-top:10px}
+  .row{display:flex;align-items:center;gap:14px;min-height:52px}
+  .tile-ico{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:white;flex:none}
+  .tile-ico svg{width:22px;height:22px}
+  .row .title{font-size:22px;font-weight:820;color:#F1F2F5}
+  .divider{height:1px;background:var(--line);margin:8px 0}
+  .add-row{display:flex;gap:16px;align-items:center;color:#8A8E9B;font-size:17px;font-weight:740;height:46px}
+  .fab{
+    position:absolute;
+    right:18px;
+    bottom:20px;
+    width:66px;height:66px;border-radius:50%;
+    border:0;background:var(--blue);color:white;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 14px 28px rgba(0,0,0,.32);
+  }
+  .fab svg{width:31px;height:31px}
+  .ai-pill{
+    position:absolute;
+    right:18px;
+    bottom:96px;
+    height:42px;
+    border:0;
+    border-radius:999px;
+    padding:0 15px;
+    color:#fff;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    font-weight:850;
+    background:linear-gradient(135deg,#2D7DF6,#7C6DFF);
+    box-shadow:0 12px 28px rgba(45,125,246,.28);
+  }
+  .ai-pill svg{width:16px;height:16px}
+  .pulse{
+    position:absolute;
+    inset:-5px;
+    border-radius:999px;
+    border:1px solid rgba(124,109,255,.55);
+    animation:pulse 1.8s ease-out infinite;
+  }
+  @keyframes pulse{from{opacity:.9;transform:scale(.94)}to{opacity:0;transform:scale(1.18)}}
+
+  .chat{
+    flex:1;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    padding:4px 0 0;
+  }
+  .msg{
+    max-width:86%;
+    border-radius:18px;
+    padding:12px 14px;
+    font-size:13px;
+    line-height:1.6;
+    color:#EDEEF5;
+  }
+  .msg.user{
+    align-self:flex-end;
+    background:var(--blue);
+    border-bottom-right-radius:6px;
+  }
+  .msg.ai{
+    align-self:flex-start;
+    background:#232634;
+    border-bottom-left-radius:6px;
+    border:1px solid rgba(255,255,255,.04);
+  }
+  .msg b{color:#fff}
+  .thinking{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    color:#9EA3B1;
+    font-size:12px;
+    font-weight:720;
+    padding-left:4px;
+  }
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:10px 0 0 rgba(124,109,255,.55),20px 0 0 rgba(124,109,255,.26);animation:blink 1.2s infinite}
+  @keyframes blink{50%{opacity:.35}}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-left:2px}
+  .chip{
+    border:1px solid #3A3D49;
+    background:#20232C;
+    color:#D9DCEF;
+    padding:8px 11px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:760;
+  }
+  .chip.sel{background:rgba(45,125,246,.17);border-color:rgba(45,125,246,.56);color:#8DBBFF}
+  .composer{
+    flex:none;
+    margin:10px -2px 0;
+    border:1px solid #30333D;
+    background:#1C1E25;
+    border-radius:22px;
+    padding:10px 10px 10px 13px;
+    display:flex;
+    align-items:flex-end;
+    gap:8px;
+  }
+  .composer .placeholder{
+    flex:1;
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    color:#7F8493;
+    font-size:13px;
+    line-height:1.35;
+  }
+  .send{
+    width:36px;height:36px;border-radius:13px;border:0;
+    background:linear-gradient(135deg,#2D7DF6,#7C6DFF);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    flex:none;
+  }
+  .send svg{width:18px;height:18px}
+
+  .draft-head{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin:2px 0 12px;
+  }
+  .draft-head .badge{
+    width:30px;height:30px;border-radius:11px;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#2D7DF6,#7C6DFF);
+    color:#fff;
+  }
+  .draft-head .t{font-size:15px;font-weight:860}
+  .draft-head .s{font-size:11.5px;color:var(--muted);font-weight:720;margin-top:2px}
+  .draft-list{display:flex;flex-direction:column;gap:10px}
+  .card{
+    border:1px solid #323541;
+    background:linear-gradient(145deg,#1B1D24 0%,#181A20 100%);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 10px 28px rgba(0,0,0,.18);
+  }
+  .card.project{border-color:rgba(45,125,246,.42);background:linear-gradient(145deg,rgba(45,125,246,.14),#181A20 70%)}
+  .card-top{
+    display:grid;
+    grid-template-columns:34px 1fr auto;
+    gap:10px;
+    align-items:center;
+    padding:12px 13px;
+  }
+  .kind{
+    width:34px;height:34px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    background:#252833;color:#AEB4C4;
+  }
+  .project .kind{background:rgba(45,125,246,.18);color:#80B3FF}
+  .ct{font-size:14.5px;font-weight:850;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cm{display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap}
+  .pill{
+    font-size:10.5px;
+    font-weight:800;
+    padding:3px 7px;
+    border-radius:8px;
+    background:#2A2D38;
+    color:#AEB4C4;
+  }
+  .pill.blue{background:rgba(45,125,246,.18);color:#8DBBFF}
+  .pill.green{background:rgba(48,209,88,.13);color:#7EEB9A}
+  .pill.amber{background:rgba(255,209,102,.14);color:#FFD166}
+  .edit{font-size:11px;color:#8B90A0;font-weight:760}
+  .subtasks{border-top:1px solid #2C2E38;padding:8px 13px 11px;display:flex;flex-direction:column;gap:7px}
+  .subtask{display:flex;gap:9px;align-items:flex-start;color:#E7E8EF;font-size:12.5px;line-height:1.35}
+  .check{width:17px;height:17px;border-radius:6px;border:1.5px solid #737887;flex:none;margin-top:1px}
+  .confirm-bar{
+    position:absolute;
+    left:0;right:0;bottom:0;
+    padding:12px 16px 16px;
+    background:rgba(18,19,23,.88);
+    backdrop-filter:blur(18px);
+    border-top:1px solid rgba(255,255,255,.07);
+    display:flex;
+    gap:9px;
+  }
+  .btn{
+    border:0;
+    border-radius:15px;
+    min-height:46px;
+    font-size:14px;
+    font-weight:860;
+    padding:0 14px;
+  }
+  .btn.secondary{background:#252832;color:#DDE0EA}
+  .btn.primary{flex:1;background:var(--blue);color:#fff;box-shadow:0 12px 28px rgba(45,125,246,.24)}
+
+  .done{
+    height:100%;
+    display:flex;
+    flex-direction:column;
+    padding:24px 2px 0;
+  }
+  .done-hero{
+    padding:22px 18px;
+    border-radius:24px;
+    background:linear-gradient(145deg,rgba(48,209,88,.16),rgba(45,125,246,.10));
+    border:1px solid rgba(48,209,88,.22);
+  }
+  .done-hero .ok{
+    width:52px;height:52px;border-radius:18px;background:var(--green);display:flex;align-items:center;justify-content:center;color:#07130A;margin-bottom:14px;
+  }
+  .done-hero .ok svg{width:29px;height:29px}
+  .done-hero h3{font-size:22px;font-weight:900}
+  .done-hero p{font-size:12.5px;line-height:1.6;color:#B7BDCB;margin-top:7px}
+  .links{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+  .link-card{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-height:58px;
+    border-radius:18px;
+    background:#1C1E25;
+    border:1px solid #2B2E38;
+    padding:10px 13px;
+  }
+  .link-ico{width:34px;height:34px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:#252833;color:#AEB4C4}
+  .link-card .lt{font-size:14px;font-weight:830}
+  .link-card .lm{font-size:11.5px;color:#8D92A2;margin-top:2px;font-weight:720}
+  .undo{
+    margin-top:auto;
+    display:flex;
+    gap:9px;
+    padding:12px 0 2px;
+  }
+  .undo .btn{flex:1}
+
+  .spec{
+    max-width:1180px;
+    margin:34px auto 0;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+  }
+  .spec-card{
+    border:1px solid rgba(255,255,255,.08);
+    background:rgba(255,255,255,.045);
+    border-radius:20px;
+    padding:16px;
+  }
+  .spec-card h3{font-size:14px;font-weight:860;margin-bottom:9px}
+  .spec-card p,.spec-card li{font-size:12.5px;line-height:1.65;color:#B9BDCA}
+  .spec-card ul{padding-left:17px}
+  .spec-card b{color:#fff}
+
+  @media (max-width:1280px){
+    .board{grid-template-columns:repeat(2, minmax(282px,1fr))}
+    .spec{grid-template-columns:1fr}
+  }
+  @media (max-width:760px){
+    body{padding:24px 14px 50px}
+    .hero{align-items:flex-start;flex-direction:column}
+    .tagline{justify-content:flex-start}
+    .board{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div>
+      <h1>AI 对话式捕获 · 高保真 V1</h1>
+      <p>用户不用先判断“这是任务/项目/念头”。直接把一句话、一段碎念或一串待办丢给 AI。AI 以对话方式理清，生成可编辑草稿，用户确认后一次性创建任务。</p>
+    </div>
+    <div class="tagline">
+      <span class="tag">入口一触达</span>
+      <span class="tag">多轮对话</span>
+      <span class="tag">草稿确认</span>
+      <span class="tag">批量创建 + 撤销</span>
+    </div>
+  </header>
+
+  <main class="board">
+    <section class="frame-wrap">
+      <div class="phone-shell">
+        <div class="phone">
+          <div class="status"><span>9:41</span><div class="sys"><span class="wifi"></span><span class="sig"></span></div></div>
+          <div class="nav">
+            <div><h2>Things</h2></div>
+            <div class="spacer"></div>
+            <button class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+            <button class="icon ai"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.5L19 9l-5.3 1.5L12 16l-1.7-5.5L5 9l5.3-1.5zM18 14l.8 2.4L21 17l-2.2.6L18 20l-.8-2.4L15 17l2.2-.6z"/></svg></button>
+          </div>
+          <div class="screen">
+            <div class="home-list">
+              <div class="row"><div class="tile-ico" style="background:#5B8FF9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M5 7h14v10H5z"/><path d="M9 17l-2 3h10l-2-3"/></svg></div><div class="title">收件箱</div></div>
+              <div class="row"><div class="tile-ico" style="background:#FFC928"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.5 5.1 5.6.8-4 3.9.9 5.5L12 15.7 7 18.3l.9-5.5-4-3.9 5.6-.8z"/></svg></div><div class="title">今天</div></div>
+              <div class="row"><div class="tile-ico" style="background:#EF5350"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="5" width="14" height="15" rx="2"/><path d="M8 3v4M16 3v4M5 10h14"/></svg></div><div class="title">计划</div></div>
+              <div class="row"><div class="tile-ico" style="background:#24BDB3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 4l8 6-8 6-8-6z"/><path d="M4 14l8 6 8-6"/></svg></div><div class="title">随时</div></div>
+              <div class="row"><div class="tile-ico" style="background:#B7935A"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 7h14v11H5z"/><path d="M8 7V5h8v2"/><path d="M9 12h6M12 10v6"/></svg></div><div class="title">将来</div></div>
+              <div class="divider"></div>
+              <div class="add-row"><span style="font-size:28px">＋</span><span>新建项目</span></div>
+              <div class="add-row"><span style="font-size:28px">＋</span><span>新建领域</span></div>
+            </div>
+            <button class="ai-pill"><span class="pulse"></span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 5.5L19 9l-5.3 1.5L12 16l-1.7-5.5L5 9l5.3-1.5z"/></svg>说给 AI</button>
+            <button class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <div class="caption"><div class="k">① 快捷入口</div><div class="v">保留手动加号。新增轻量 AI pill，任何列表都能一键进入对话捕获。右上角 AI 图标也进入同一页，模型设置放到 AI 页里的齿轮。</div></div>
+    </section>
+
+    <section class="frame-wrap">
+      <div class="phone-shell">
+        <div class="phone">
+          <div class="status"><span>9:41</span><div class="sys"><span class="wifi"></span><span class="sig"></span></div></div>
+          <div class="nav">
+            <button class="icon" style="background:transparent;color:#7F8493;width:28px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <div><h2 style="font-size:19px">AI 理清</h2><div class="sub">可输入一句话、多行列表或语音转写</div></div>
+            <div class="spacer"></div>
+            <button class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.1 2.1-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V20h-3v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2.1-2.1.1-.1A1.7 1.7 0 0 0 5 15a1.7 1.7 0 0 0-1.5-1H3v-3h.5A1.7 1.7 0 0 0 5 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.1-2.1.1.1A1.7 1.7 0 0 0 8.7 6a1.7 1.7 0 0 0 1-1.5V4h3v.5a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1L17.8 8l-.1.1A1.7 1.7 0 0 0 17 10c.2.6.8 1 1.5 1H19v3h-.5c-.7 0-1.3.4-1.5 1z"/></svg></button>
+          </div>
+          <div class="screen" style="display:flex;flex-direction:column">
+            <div class="chat">
+              <div class="msg user">最近想开始学日语。还有下周要准备产品周会，记得给王总发那个 AI 配置方案。</div>
+              <div class="thinking"><span class="dot"></span><span>正在拆解意图</span></div>
+              <div class="msg ai">我先拆成 <b>1 个项目 + 2 个任务</b>。日语这条比较模糊，需要你确认目标；另外两条已经足够具体。</div>
+              <div class="msg ai">学日语是为了哪类目标？</div>
+              <div class="chips">
+                <span class="chip sel">旅行能交流</span>
+                <span class="chip">考试</span>
+                <span class="chip">看内容</span>
+                <span class="chip">先随便学</span>
+              </div>
+              <div class="msg user">先旅行能交流，周会放下周一，AI 方案今天发。</div>
+              <div class="msg ai">收到。我把时间也带上了。你可以继续说“拆细一点”“第二个不要建”“都放某项目”。</div>
+            </div>
+            <div class="composer">
+              <div class="placeholder">继续补充、修改或直接说“创建”</div>
+              <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption"><div class="k">② 多轮对话</div><div class="v">AI 用回答推进，不是表单。高置信直接出草稿；低置信只问必要问题。用户用自然语言修正草稿。</div></div>
+    </section>
+
+    <section class="frame-wrap">
+      <div class="phone-shell">
+        <div class="phone">
+          <div class="status"><span>9:41</span><div class="sys"><span class="wifi"></span><span class="sig"></span></div></div>
+          <div class="nav">
+            <button class="icon" style="background:transparent;color:#7F8493;width:28px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            <div><h2 style="font-size:19px">准备创建</h2><div class="sub">3 个对象，确认后写入 Things</div></div>
+            <div class="spacer"></div>
+          </div>
+          <div class="screen" style="padding-bottom:88px">
+            <div class="draft-head">
+              <div class="badge"><svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M12 2l1.7 5.5L19 9l-5.3 1.5L12 16l-1.7-5.5L5 9l5.3-1.5z"/></svg></div>
+              <div><div class="t">AI 草稿</div><div class="s">点击任意字段可编辑，左滑可排除</div></div>
+            </div>
+            <div class="draft-list">
+              <div class="card project">
+                <div class="card-top">
+                  <div class="kind"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h6l2 2h8v10H4z"/></svg></div>
+                  <div>
+                    <div class="ct">日语旅行会话入门</div>
+                    <div class="cm"><span class="pill blue">项目</span><span class="pill">学习</span><span class="pill green">随时</span></div>
+                  </div>
+                  <div class="edit">编辑</div>
+                </div>
+                <div class="subtasks">
+                  <div class="subtask"><span class="check"></span><span>今晚比较 2 门日语入门课并选 1 门</span></div>
+                  <div class="subtask"><span class="check"></span><span>建立 15 分钟日语练习提醒</span></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-top">
+                  <div class="kind"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12l4 4L19 6"/></svg></div>
+                  <div>
+                    <div class="ct">准备下周产品周会材料</div>
+                    <div class="cm"><span class="pill amber">下周一</span><span class="pill">工作</span></div>
+                  </div>
+                  <div class="edit">编辑</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-top">
+                  <div class="kind"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16v14H7l-3 3z"/></svg></div>
+                  <div>
+                    <div class="ct">把 AI 配置方案发给王总</div>
+                    <div class="cm"><span class="pill green">今天</span><span class="pill">AI 配置</span></div>
+                  </div>
+                  <div class="edit">编辑</div>
+                </div>
+              </div>
+            </div>
+            <div class="msg ai" style="margin-top:12px;max-width:100%">我会创建 1 个项目、4 个任务，并把今天要做的放进“今天”。</div>
+          </div>
+          <div class="confirm-bar">
+            <button class="btn secondary">继续对话</button>
+            <button class="btn primary">创建 5 项</button>
+          </div>
+        </div>
+      </div>
+      <div class="caption"><div class="k">③ 草稿确认</div><div class="v">不另开复杂评审页。草稿以卡片固定在对话里，字段可点改，确认后批量创建；取消或返回只保留对话草稿。</div></div>
+    </section>
+
+    <section class="frame-wrap">
+      <div class="phone-shell">
+        <div class="phone">
+          <div class="status"><span>9:41</span><div class="sys"><span class="wifi"></span><span class="sig"></span></div></div>
+          <div class="nav">
+            <button class="icon" style="background:transparent;color:#7F8493;width:28px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <div><h2 style="font-size:19px">已创建</h2><div class="sub">本次批量创建完成</div></div>
+            <div class="spacer"></div>
+          </div>
+          <div class="screen">
+            <div class="done">
+              <div class="done-hero">
+                <div class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></div>
+                <h3>5 项已建好</h3>
+                <p>AI 对话会保留为这批任务的来源记录。你可以立即进入今天或项目继续处理。</p>
+              </div>
+              <div class="links">
+                <div class="link-card">
+                  <div class="link-ico" style="color:#FFD166"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3l2.5 5.1 5.6.8-4 3.9.9 5.5L12 15.7 7 18.3l.9-5.5-4-3.9 5.6-.8z"/></svg></div>
+                  <div><div class="lt">去今天</div><div class="lm">查看 2 个今天任务</div></div>
+                </div>
+                <div class="link-card">
+                  <div class="link-ico" style="color:#8DBBFF"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h6l2 2h8v10H4z"/></svg></div>
+                  <div><div class="lt">日语旅行会话入门</div><div class="lm">1 个项目，2 个下一步</div></div>
+                </div>
+                <div class="link-card">
+                  <div class="link-ico" style="color:#AEB4C4"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5v14"/></svg></div>
+                  <div><div class="lt">继续告诉 AI</div><div class="lm">保持同一轮上下文</div></div>
+                </div>
+              </div>
+              <div class="undo">
+                <button class="btn secondary">撤销创建</button>
+                <button class="btn primary">完成</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="caption"><div class="k">④ 创建完成</div><div class="v">结果页给去向和撤销。撤销按批次回滚所有新建对象，防止 AI 建错后用户要逐条删除。</div></div>
+    </section>
+  </main>
+
+  <section class="spec">
+    <div class="spec-card">
+      <h3>入口规则</h3>
+      <ul>
+        <li><b>AI pill</b> 是最快入口，浮在全局加号上方，只在移动端主列表/项目/视图显示。</li>
+        <li>右上角 AI 图标进入同一对话页；模型配置移动到对话页右上角齿轮。</li>
+        <li>手动加号不变，继续负责精确新建单条任务。</li>
+      </ul>
+    </div>
+    <div class="spec-card">
+      <h3>对话规则</h3>
+      <ul>
+        <li>高置信：直接出草稿并等待确认。</li>
+        <li>低置信：最多先问 1-2 个关键问题。</li>
+        <li>用户可用自然语言修改草稿，例如“第二个不要建”“都放今天”“拆细一点”。</li>
+      </ul>
+    </div>
+    <div class="spec-card">
+      <h3>创建规则</h3>
+      <ul>
+        <li>确认前不写数据库；草稿可退出后保留。</li>
+        <li>确认时按批次创建项目、任务、标签、时间、截止日期、提醒。</li>
+        <li>创建后提供批次撤销；失败时保留草稿并展示失败项。</li>
+      </ul>
+    </div>
+  </section>
+</body>
+</html>

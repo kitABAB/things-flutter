@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../domain/models/item.dart';
 import '../../app_view.dart';
 import '../../providers/item_providers.dart';
-import '../../screens/ai_settings_screen.dart';
+import '../../screens/ai_conversation_capture_screen.dart';
 import '../../screens/project_screen.dart';
 import '../../screens/search_screen.dart';
 import '../../screens/task_detail_screen.dart';
@@ -15,6 +15,7 @@ import '../../screens/view_screen.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/add_edit_item_modal.dart';
+import '../../shared/widgets/magic_plus.dart';
 import '../../shared/widgets/tag_picker_sheet.dart';
 import '../../shared/widgets/things_checkbox.dart';
 import '../../shared/widgets/when_picker_sheet.dart';
@@ -63,10 +64,15 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
     );
   }
 
-  void _openAiSettings() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const AiSettingsScreen()));
+  void _openAiCapture() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(
+          name: MagicPlusNavObserver.hidePlusRouteName,
+        ),
+        builder: (_) => const AiConversationCaptureScreen(),
+      ),
+    );
   }
 
   void _select(SidebarSelection selection) {
@@ -207,9 +213,9 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
             onPressed: _openSearch,
           ),
           _ToolbarIcon(
-            tooltip: 'AI 模型',
+            tooltip: 'AI 理清',
             icon: Icons.auto_awesome_outlined,
-            onPressed: _openAiSettings,
+            onPressed: _openAiCapture,
           ),
           const SizedBox(width: 8),
           FilledButton.icon(

@@ -28,7 +28,7 @@ class OpenAiCompatClient implements LlmClient {
     List<LlmMessage> messages, {
     bool jsonMode = false,
     double temperature = 0.2,
-    Duration timeout = const Duration(seconds: 20),
+    Duration timeout = const Duration(seconds: 45),
   }) async {
     if (!config.isReady) {
       throw const LlmException.notConfigured();
@@ -148,7 +148,8 @@ class OpenAiCompatClient implements LlmClient {
   /// 尽量从厂商的错误响应里抽出可读信息（OpenAI 风格 {error:{message}}）。
   String? _extractError(List<int> bytes) {
     try {
-      final m = jsonDecode(utf8.decode(bytes));
+      var m = jsonDecode(utf8.decode(bytes));
+      if (m is List && m.isNotEmpty) m = m.first;
       if (m is Map && m['error'] is Map) {
         return m['error']['message'] as String?;
       }
@@ -176,6 +177,9 @@ class OpenAiCompatClient implements LlmClient {
       case 408:
         return '服务端处理超时（408），请稍后重试';
       case 429:
+        if (_looksLikeDailyQuota(detail)) {
+          return '模型免费额度已用完（429），请切换策略组、模型或 API Key，或等待额度刷新';
+        }
         return '请求过于频繁、已被限流（429）。免费额度有限，请等待 30~60 秒后重试';
       default:
         if (code >= 500) {
@@ -189,6 +193,16 @@ class OpenAiCompatClient implements LlmClient {
   static String _briefCause(Object e) {
     final s = e.toString();
     return s.length > 80 ? '${s.substring(0, 80)}…' : s;
+  }
+
+  static bool _looksLikeDailyQuota(String? detail) {
+    if (detail == null || detail.trim().isEmpty) return false;
+    final lower = detail.toLowerCase();
+    return lower.contains('perday') ||
+        lower.contains('per day') ||
+        lower.contains('current quota') ||
+        lower.contains('quota exceeded') ||
+        lower.contains('free_tier_requests');
   }
 
   static String _trimSlash(String s) =>

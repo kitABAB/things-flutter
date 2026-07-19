@@ -40,7 +40,8 @@ class ItemRepository {
     final nowIso = now.toIso8601String();
     final order = now.millisecondsSinceEpoch;
 
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO items
         (id, user_id, type, title, status, completed_at, trashed,
          start, start_date, evening, deadline,
@@ -52,13 +53,27 @@ class ItemRepository {
               ?, ?, ?, 0,
               ?, ?, ?, ?, ?,
               ?, ?)
-    ''', [
-      id, currentUserId, title,
-      start.name, _dateOnly(startDate), evening ? 1 : 0, _dateOnly(deadline),
-      repeat.name, repeatInterval, reminderTime,
-      areaId, projectId, headingId, order, order,
-      nowIso, nowIso,
-    ]);
+    ''',
+      [
+        id,
+        currentUserId,
+        title,
+        start.name,
+        _dateOnly(startDate),
+        evening ? 1 : 0,
+        _dateOnly(deadline),
+        repeat.name,
+        repeatInterval,
+        reminderTime,
+        areaId,
+        projectId,
+        headingId,
+        order,
+        order,
+        nowIso,
+        nowIso,
+      ],
+    );
     await _reschedule(id);
     return id;
   }
@@ -71,25 +86,44 @@ class ItemRepository {
     final id = _uuid.v4();
     final nowIso = DateTime.now().toIso8601String();
     final order = DateTime.now().millisecondsSinceEpoch;
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO items
         (id, user_id, type, title, status, trashed, start, evening,
          area_id, sort_order, today_sort_order, created_at, updated_at)
       VALUES (?, ?, 'project', ?, 'open', 0, ?, 0, ?, ?, ?, ?, ?)
-    ''', [id, currentUserId, title, start.name, areaId, order, order, nowIso, nowIso]);
+    ''',
+      [
+        id,
+        currentUserId,
+        title,
+        start.name,
+        areaId,
+        order,
+        order,
+        nowIso,
+        nowIso,
+      ],
+    );
     return id;
   }
 
-  Future<String> createHeading({required String title, required String projectId}) async {
+  Future<String> createHeading({
+    required String title,
+    required String projectId,
+  }) async {
     final id = _uuid.v4();
     final nowIso = DateTime.now().toIso8601String();
     final order = DateTime.now().millisecondsSinceEpoch;
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO items
         (id, user_id, type, title, status, trashed, start, evening,
          project_id, sort_order, today_sort_order, created_at, updated_at)
       VALUES (?, ?, 'heading', ?, 'open', 0, 'anytime', 0, ?, ?, ?, ?, ?)
-    ''', [id, currentUserId, title, projectId, order, order, nowIso, nowIso]);
+    ''',
+      [id, currentUserId, title, projectId, order, order, nowIso, nowIso],
+    );
     return id;
   }
 
@@ -97,25 +131,54 @@ class ItemRepository {
     final id = _uuid.v4();
     final nowIso = DateTime.now().toIso8601String();
     final order = DateTime.now().millisecondsSinceEpoch;
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO areas (id, user_id, title, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    ''', [id, currentUserId, title, order, nowIso, nowIso]);
+    ''',
+      [id, currentUserId, title, order, nowIso, nowIso],
+    );
     return id;
+  }
+
+  Future<void> deleteArea(String id) async {
+    final now = DateTime.now().toIso8601String();
+    final tagRows = await db.getAll(
+      'SELECT id FROM item_tags WHERE item_id = ?',
+      [id],
+    );
+    for (final row in tagRows) {
+      await _enqueueTombstone('item_tags', row['id'] as String);
+    }
+    await _enqueueTombstone('areas', id);
+    await db.writeTransaction((tx) async {
+      await tx.execute('DELETE FROM item_tags WHERE item_id = ?', [id]);
+      await tx.execute(
+        'UPDATE items SET area_id = NULL, updated_at = ? WHERE area_id = ?',
+        [now, id],
+      );
+      await tx.execute('DELETE FROM areas WHERE id = ?', [id]);
+    });
   }
 
   /// 编辑标题。
   Future<void> updateContent(String id, {required String title}) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET title = ?, updated_at = ? WHERE id = ?
-    ''', [title, DateTime.now().toIso8601String(), id]);
+    ''',
+      [title, DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 变更条目类型（AI 理清把一条任务转成项目时使用）。
   Future<void> setType(String id, ItemType type) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET type = ?, updated_at = ? WHERE id = ?
-    ''', [type.name, DateTime.now().toIso8601String(), id]);
+    ''',
+      [type.name, DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 设置调度意图（When）。这是「计划 / 今天 / 今晚 / 随时 / 将来」改期的统一入口。
@@ -125,40 +188,61 @@ class ItemRepository {
     DateTime? startDate,
     bool evening = false,
   }) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items
       SET start = ?, start_date = ?, evening = ?, updated_at = ?
       WHERE id = ?
-    ''', [start.name, _dateOnly(startDate), evening ? 1 : 0, DateTime.now().toIso8601String(), id]);
+    ''',
+      [
+        start.name,
+        _dateOnly(startDate),
+        evening ? 1 : 0,
+        DateTime.now().toIso8601String(),
+        id,
+      ],
+    );
     await _reschedule(id);
   }
 
   /// 仅切换「今晚」标记（不动 start / start_date）。
   /// 供「今天」视图里把任务在「白天 ⇄ 今晚」两段之间拖拽时使用。
   Future<void> setEvening(String id, bool evening) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET evening = ?, updated_at = ? WHERE id = ?
-    ''', [evening ? 1 : 0, DateTime.now().toIso8601String(), id]);
+    ''',
+      [evening ? 1 : 0, DateTime.now().toIso8601String(), id],
+    );
   }
 
   Future<void> setDeadline(String id, DateTime? deadline) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET deadline = ?, updated_at = ? WHERE id = ?
-    ''', [_dateOnly(deadline), DateTime.now().toIso8601String(), id]);
+    ''',
+      [_dateOnly(deadline), DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 设置重复规则。
   Future<void> setRepeat(String id, RepeatRule rule, {int interval = 1}) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET repeat = ?, repeat_interval = ?, updated_at = ? WHERE id = ?
-    ''', [rule.name, interval, DateTime.now().toIso8601String(), id]);
+    ''',
+      [rule.name, interval, DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 设置 / 清除闹钟提醒（'HH:mm'，传 null 清除）。
   Future<void> setReminder(String id, String? hhmm) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET reminder_time = ?, updated_at = ? WHERE id = ?
-    ''', [hhmm, DateTime.now().toIso8601String(), id]);
+    ''',
+      [hhmm, DateTime.now().toIso8601String(), id],
+    );
     await _reschedule(id);
   }
 
@@ -179,9 +263,12 @@ class ItemRepository {
       await NotificationService.instance.cancel(id);
     }
 
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET status = ?, completed_at = ?, updated_at = ? WHERE id = ?
-    ''', [status.name, completedAt, now, id]);
+    ''',
+      [status.name, completedAt, now, id],
+    );
 
     if (status == ItemStatus.open) await _reschedule(id);
   }
@@ -213,15 +300,18 @@ class ItemRepository {
     );
 
     // 复制标签
-    final tagRows =
-        await db.getAll('SELECT tag_id FROM item_tags WHERE item_id = ?', [it.id]);
+    final tagRows = await db.getAll(
+      'SELECT tag_id FROM item_tags WHERE item_id = ?',
+      [it.id],
+    );
     for (final r in tagRows) {
       await attachTag(newId, r['tag_id'] as String);
     }
     // 复制检查项（重置为未完成）
     final clRows = await db.getAll(
-        'SELECT title FROM checklist_items WHERE item_id = ? ORDER BY sort_order ASC',
-        [it.id]);
+      'SELECT title FROM checklist_items WHERE item_id = ? ORDER BY sort_order ASC',
+      [it.id],
+    );
     for (final r in clRows) {
       await addChecklistItem(newId, r['title'] as String);
     }
@@ -233,7 +323,11 @@ class ItemRepository {
     if (rows.isEmpty) return;
     final it = Item.fromRow(rows.first as Map<String, dynamic>);
     final t = it.reminderTime;
-    if (it.isDone || it.trashed || it.startDate == null || t == null || t.isEmpty) {
+    if (it.isDone ||
+        it.trashed ||
+        it.startDate == null ||
+        t == null ||
+        t.isEmpty) {
       await NotificationService.instance.cancel(id);
       return;
     }
@@ -241,22 +335,36 @@ class ItemRepository {
     final h = int.tryParse(parts.first) ?? 9;
     final m = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
     final when = DateTime(
-        it.startDate!.year, it.startDate!.month, it.startDate!.day, h, m);
-    await NotificationService.instance
-        .schedule(itemId: id, title: it.title, when: when);
+      it.startDate!.year,
+      it.startDate!.month,
+      it.startDate!.day,
+      h,
+      m,
+    );
+    await NotificationService.instance.schedule(
+      itemId: id,
+      title: it.title,
+      when: when,
+    );
   }
 
   /// 移入垃圾站（软删除）。
   Future<void> moveToTrash(String id) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET trashed = 1, updated_at = ? WHERE id = ?
-    ''', [DateTime.now().toIso8601String(), id]);
+    ''',
+      [DateTime.now().toIso8601String(), id],
+    );
   }
 
   Future<void> restore(String id) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET trashed = 0, updated_at = ? WHERE id = ?
-    ''', [DateTime.now().toIso8601String(), id]);
+    ''',
+      [DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 移动任务的归属。
@@ -272,11 +380,14 @@ class ItemRepository {
     final WhenStart start = toInbox
         ? WhenStart.inbox
         : (currentStart == WhenStart.inbox ? WhenStart.anytime : currentStart);
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items
       SET area_id = ?, project_id = ?, heading_id = NULL, start = ?, updated_at = ?
       WHERE id = ?
-    ''', [areaId, projectId, start.name, DateTime.now().toIso8601String(), id]);
+    ''',
+      [areaId, projectId, start.name, DateTime.now().toIso8601String(), id],
+    );
   }
 
   // ---------------- 检查项 ----------------
@@ -285,23 +396,32 @@ class ItemRepository {
     final id = _uuid.v4();
     final nowIso = DateTime.now().toIso8601String();
     final order = DateTime.now().millisecondsSinceEpoch;
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO checklist_items
         (id, item_id, title, is_completed, sort_order, created_at, updated_at)
       VALUES (?, ?, ?, 0, ?, ?, ?)
-    ''', [id, taskId, title, order, nowIso, nowIso]);
+    ''',
+      [id, taskId, title, order, nowIso, nowIso],
+    );
   }
 
   Future<void> toggleChecklistItem(String id, bool done) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE checklist_items SET is_completed = ?, updated_at = ? WHERE id = ?
-    ''', [done ? 1 : 0, DateTime.now().toIso8601String(), id]);
+    ''',
+      [done ? 1 : 0, DateTime.now().toIso8601String(), id],
+    );
   }
 
   Future<void> renameChecklistItem(String id, String title) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE checklist_items SET title = ?, updated_at = ? WHERE id = ?
-    ''', [title, DateTime.now().toIso8601String(), id]);
+    ''',
+      [title, DateTime.now().toIso8601String(), id],
+    );
   }
 
   Future<void> deleteChecklistItem(String id) async {
@@ -310,13 +430,18 @@ class ItemRepository {
   }
 
   Stream<List<ChecklistItem>> watchChecklist(String taskId) {
-    return db.watch('''
+    return db
+        .watch(
+          '''
       SELECT * FROM checklist_items WHERE item_id = ? ORDER BY sort_order ASC
-    ''', parameters: [taskId]).map(
-      (rows) => rows
-          .map((r) => ChecklistItem.fromRow(r as Map<String, dynamic>))
-          .toList(),
-    );
+    ''',
+          parameters: [taskId],
+        )
+        .map(
+          (rows) => rows
+              .map((r) => ChecklistItem.fromRow(r as Map<String, dynamic>))
+              .toList(),
+        );
   }
 
   // ---------------- 标签 ----------------
@@ -325,40 +450,53 @@ class ItemRepository {
     final id = _uuid.v4();
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final order = DateTime.now().millisecondsSinceEpoch;
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO tags (id, user_id, title, parent_tag_id, sort_order, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    ''', [id, currentUserId, title, parentTagId, order, nowIso]);
+    ''',
+      [id, currentUserId, title, parentTagId, order, nowIso],
+    );
     return id;
   }
 
   Future<void> attachTag(String itemId, String tagId) async {
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO item_tags (id, user_id, item_id, tag_id, updated_at)
       VALUES (?, ?, ?, ?, ?)
-    ''', [
-      _uuid.v4(),
-      currentUserId,
-      itemId,
-      tagId,
-      DateTime.now().toUtc().toIso8601String()
-    ]);
+    ''',
+      [
+        _uuid.v4(),
+        currentUserId,
+        itemId,
+        tagId,
+        DateTime.now().toUtc().toIso8601String(),
+      ],
+    );
   }
 
   Future<void> detachTag(String itemId, String tagId) async {
     final rows = await db.getAll(
-        'SELECT id FROM item_tags WHERE item_id = ? AND tag_id = ?',
-        [itemId, tagId]);
+      'SELECT id FROM item_tags WHERE item_id = ? AND tag_id = ?',
+      [itemId, tagId],
+    );
     for (final r in rows) {
       await _enqueueTombstone('item_tags', r['id'] as String);
     }
-    await db.execute(
-        'DELETE FROM item_tags WHERE item_id = ? AND tag_id = ?', [itemId, tagId]);
+    await db.execute('DELETE FROM item_tags WHERE item_id = ? AND tag_id = ?', [
+      itemId,
+      tagId,
+    ]);
   }
 
   Stream<List<Tag>> watchTags() {
-    return db.watch('SELECT * FROM tags ORDER BY sort_order ASC').map(
-        (rows) => rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList());
+    return db
+        .watch('SELECT * FROM tags ORDER BY sort_order ASC')
+        .map(
+          (rows) =>
+              rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList(),
+        );
   }
 
   /// 全部「条目 -> 标签集合」映射，供各视图顶部的标签过滤器使用。
@@ -375,31 +513,46 @@ class ItemRepository {
   }
 
   Stream<List<Tag>> watchItemTags(String itemId) {
-    return db.watch('''
+    return db
+        .watch(
+          '''
       SELECT t.* FROM tags t
       JOIN item_tags it ON it.tag_id = t.id
       WHERE it.item_id = ?
       ORDER BY t.sort_order ASC
-    ''', parameters: [itemId]).map(
-        (rows) => rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList());
+    ''',
+          parameters: [itemId],
+        )
+        .map(
+          (rows) =>
+              rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList(),
+        );
   }
 
   /// 继承得来的标签（来自所属项目 / 区域，不含自身直接打的标签）。
   Stream<List<Tag>> watchInheritedTags(String itemId) {
-    return db.watch('''
+    return db
+        .watch(
+          '''
       SELECT DISTINCT t.* FROM tags t
       JOIN item_tags it ON it.tag_id = t.id
       JOIN items self ON self.id = ?
       WHERE (it.item_id = self.project_id OR it.item_id = self.area_id)
         AND t.id NOT IN (SELECT tag_id FROM item_tags WHERE item_id = ?)
       ORDER BY t.sort_order ASC
-    ''', parameters: [itemId, itemId]).map(
-        (rows) => rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList());
+    ''',
+          parameters: [itemId, itemId],
+        )
+        .map(
+          (rows) =>
+              rows.map((r) => Tag.fromRow(r as Map<String, dynamic>)).toList(),
+        );
   }
 
   /// 「条目 -> 有效标签集合」映射，含从项目/区域继承的标签。供视图过滤器使用。
   Stream<Map<String, Set<String>>> watchEffectiveItemTagLinks() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT i.id AS item_id, it.tag_id AS tag_id
       FROM items i
       JOIN item_tags it
@@ -407,24 +560,28 @@ class ItemRepository {
         OR it.item_id = i.project_id
         OR it.item_id = i.area_id
       WHERE i.trashed = 0
-    ''').map((rows) {
-      final map = <String, Set<String>>{};
-      for (final r in rows) {
-        final itemId = r['item_id'] as String;
-        final tagId = r['tag_id'] as String;
-        map.putIfAbsent(itemId, () => <String>{}).add(tagId);
-      }
-      return map;
-    });
+    ''')
+        .map((rows) {
+          final map = <String, Set<String>>{};
+          for (final r in rows) {
+            final itemId = r['item_id'] as String;
+            final tagId = r['tag_id'] as String;
+            map.putIfAbsent(itemId, () => <String>{}).add(tagId);
+          }
+          return map;
+        });
   }
 
   // ---------------- 单条 ----------------
 
   Stream<Item?> watchItem(String id) {
-    return db.watch('SELECT * FROM items WHERE id = ?', parameters: [id]).map(
-        (rows) => rows.isEmpty
-            ? null
-            : Item.fromRow(rows.first as Map<String, dynamic>));
+    return db
+        .watch('SELECT * FROM items WHERE id = ?', parameters: [id])
+        .map(
+          (rows) => rows.isEmpty
+              ? null
+              : Item.fromRow(rows.first as Map<String, dynamic>),
+        );
   }
 
   // ---------------- 搜索 ----------------
@@ -433,7 +590,8 @@ class ItemRepository {
   Future<List<Item>> search(String query) async {
     final q = query.trim();
     if (q.isEmpty) return [];
-    final rows = await db.getAll('''
+    final rows = await db.getAll(
+      '''
       SELECT * FROM items
       WHERE trashed = 0
         AND type IN ('task','project')
@@ -442,13 +600,16 @@ class ItemRepository {
         CASE status WHEN 'open' THEN 0 ELSE 1 END,
         updated_at DESC
       LIMIT 50
-    ''', ['%$q%']);
+    ''',
+      ['%$q%'],
+    );
     return rows.map((r) => Item.fromRow(r as Map<String, dynamic>)).toList();
   }
 
   /// 全局标签过滤：列出带某标签（含继承）的活跃任务/项目。
   Future<List<Item>> itemsWithTag(String tagId) async {
-    final rows = await db.getAll('''
+    final rows = await db.getAll(
+      '''
       SELECT DISTINCT i.* FROM items i
       JOIN item_tags it
         ON it.item_id = i.id OR it.item_id = i.project_id OR it.item_id = i.area_id
@@ -458,7 +619,9 @@ class ItemRepository {
         AND i.status = 'open'
       ORDER BY i.updated_at DESC
       LIMIT 100
-    ''', [tagId]);
+    ''',
+      [tagId],
+    );
     return rows.map((r) => Item.fromRow(r as Map<String, dynamic>)).toList();
   }
 
@@ -473,8 +636,7 @@ class ItemRepository {
   }
 
   Future<void> emptyTrash() async {
-    final trashed =
-        await db.getAll('SELECT id FROM items WHERE trashed = 1');
+    final trashed = await db.getAll('SELECT id FROM items WHERE trashed = 1');
     for (final r in trashed) {
       final id = r['id'] as String;
       await _enqueueChildTombstones(id);
@@ -493,13 +655,16 @@ class ItemRepository {
 
   /// 为某条目下的检查项与标签关联登记删除墓碑。
   Future<void> _enqueueChildTombstones(String itemId) async {
-    final cl =
-        await db.getAll('SELECT id FROM checklist_items WHERE item_id = ?', [itemId]);
+    final cl = await db.getAll(
+      'SELECT id FROM checklist_items WHERE item_id = ?',
+      [itemId],
+    );
     for (final r in cl) {
       await _enqueueTombstone('checklist_items', r['id'] as String);
     }
-    final it =
-        await db.getAll('SELECT id FROM item_tags WHERE item_id = ?', [itemId]);
+    final it = await db.getAll('SELECT id FROM item_tags WHERE item_id = ?', [
+      itemId,
+    ]);
     for (final r in it) {
       await _enqueueTombstone('item_tags', r['id'] as String);
     }
@@ -509,15 +674,13 @@ class ItemRepository {
 
   /// 登记一条删除墓碑（硬删除时调用），待下次同步推送给服务器。
   Future<void> _enqueueTombstone(String table, String rowId) async {
-    await db.execute('''
+    await db.execute(
+      '''
       INSERT INTO sync_deletions (id, row_table, row_id, deleted_at)
       VALUES (?, ?, ?, ?)
-    ''', [
-      _uuid.v4(),
-      table,
-      rowId,
-      DateTime.now().toUtc().toIso8601String(),
-    ]);
+    ''',
+      [_uuid.v4(), table, rowId, DateTime.now().toUtc().toIso8601String()],
+    );
   }
 
   /// 读取某表全部行（用于全量推送）。
@@ -542,11 +705,13 @@ class ItemRepository {
   Future<void> backfillTimestamps() async {
     final nowIso = DateTime.now().toUtc().toIso8601String();
     await db.execute(
-        "UPDATE tags SET updated_at = ? WHERE updated_at IS NULL OR updated_at = ''",
-        [nowIso]);
+      "UPDATE tags SET updated_at = ? WHERE updated_at IS NULL OR updated_at = ''",
+      [nowIso],
+    );
     await db.execute(
-        "UPDATE item_tags SET updated_at = ? WHERE updated_at IS NULL OR updated_at = ''",
-        [nowIso]);
+      "UPDATE item_tags SET updated_at = ? WHERE updated_at IS NULL OR updated_at = ''",
+      [nowIso],
+    );
   }
 
   /// 应用一条来自服务器的 upsert（按表写入已知列）。不触发墓碑。
@@ -575,17 +740,54 @@ class ItemRepository {
   /// 各同步表的列（用于安全地按列写入远端行）。
   static const Map<String, List<String>> _syncColumns = {
     'items': [
-      'id', 'user_id', 'type', 'title', 'status', 'completed_at',
-      'trashed', 'start', 'start_date', 'evening', 'deadline', 'repeat',
-      'repeat_interval', 'reminder_time', 'archived', 'area_id', 'project_id',
-      'heading_id', 'sort_order', 'today_sort_order', 'created_at', 'updated_at',
-    ],
-    'areas': ['id', 'user_id', 'title', 'sort_order', 'created_at', 'updated_at'],
-    'checklist_items': [
-      'id', 'item_id', 'title', 'is_completed', 'sort_order', 'created_at',
+      'id',
+      'user_id',
+      'type',
+      'title',
+      'status',
+      'completed_at',
+      'trashed',
+      'start',
+      'start_date',
+      'evening',
+      'deadline',
+      'repeat',
+      'repeat_interval',
+      'reminder_time',
+      'archived',
+      'area_id',
+      'project_id',
+      'heading_id',
+      'sort_order',
+      'today_sort_order',
+      'created_at',
       'updated_at',
     ],
-    'tags': ['id', 'user_id', 'title', 'parent_tag_id', 'sort_order', 'updated_at'],
+    'areas': [
+      'id',
+      'user_id',
+      'title',
+      'sort_order',
+      'created_at',
+      'updated_at',
+    ],
+    'checklist_items': [
+      'id',
+      'item_id',
+      'title',
+      'is_completed',
+      'sort_order',
+      'created_at',
+      'updated_at',
+    ],
+    'tags': [
+      'id',
+      'user_id',
+      'title',
+      'parent_tag_id',
+      'sort_order',
+      'updated_at',
+    ],
     'item_tags': ['id', 'user_id', 'item_id', 'tag_id', 'updated_at'],
   };
 
@@ -598,17 +800,20 @@ class ItemRepository {
   List<Item> _map(Iterable<dynamic> rows) =>
       rows.map((r) => Item.fromRow(r as Map<String, dynamic>)).toList();
 
-  static const _activeTask = "type = 'task' AND status = 'open' AND trashed = 0";
+  static const _activeTask =
+      "type = 'task' AND status = 'open' AND trashed = 0";
   static const _activeListable =
       "type IN ('task','project') AND status = 'open' AND trashed = 0";
 
   /// 收件箱：未理清的任务（start = inbox）。
   Stream<List<Item>> watchInbox() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeTask AND start = 'inbox'
       ORDER BY sort_order ASC, created_at DESC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 今天：两类来源（去重取并集）——
@@ -616,7 +821,8 @@ class ItemRepository {
   ///   2. 死线已到或逾期的任务（deadline <= 今天，无论它当前在哪个桶）。
   /// 对齐 Things：到点的死线会被强制拉到今天最上方。
   Stream<List<Item>> watchToday() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeListable
         AND (
@@ -630,25 +836,29 @@ class ItemRepository {
         CASE WHEN deadline IS NOT NULL
              AND deadline <= date('now','localtime','+2 days') THEN 0 ELSE 1 END,
         evening ASC, today_sort_order ASC, created_at ASC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 计划：anytime 且 start_date 在未来。按日期升序，UI 再分组。
   Stream<List<Item>> watchUpcoming() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeListable
         AND start = 'anytime'
         AND start_date IS NOT NULL
         AND start_date > date('now','localtime')
       ORDER BY start_date ASC, sort_order ASC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 计划视图的「占格」：被安排在未来的任务 + 未来死线影子。
   /// 一条任务可能同时产生两个占格（执行日 + 死线日），与 Things 一致。
   Stream<List<ScheduleEntry>> watchUpcomingEntries() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeListable
         AND (
@@ -657,81 +867,97 @@ class ItemRepository {
           OR (deadline IS NOT NULL AND deadline > date('now','localtime'))
         )
       ORDER BY created_at ASC
-    ''').map((rows) {
-      final items = _map(rows);
-      final entries = <ScheduleEntry>[];
-      final today = DateTime.now();
-      bool future(DateTime d) =>
-          d.isAfter(DateTime(today.year, today.month, today.day));
-      final horizon = DateTime(today.year, today.month, today.day)
-          .add(const Duration(days: 120));
-      for (final it in items) {
-        if (it.start == WhenStart.anytime &&
-            it.startDate != null &&
-            future(it.startDate!)) {
-          entries.add(ScheduleEntry(it, it.startDate!));
-        }
-        if (it.deadline != null && future(it.deadline!)) {
-          entries.add(ScheduleEntry(it, it.deadline!, isDeadline: true));
-        }
-        // 重复任务：在未来日期上排出半透明影子预视。
-        if (it.isRepeating && it.startDate != null) {
-          var d = it.startDate!;
-          for (var i = 0; i < 12; i++) {
-            final n = it.repeat.next(d, it.repeatInterval);
-            if (n == null || n.isAfter(horizon)) break;
-            d = n;
-            if (future(d)) entries.add(ScheduleEntry(it, d, isShadow: true));
+    ''')
+        .map((rows) {
+          final items = _map(rows);
+          final entries = <ScheduleEntry>[];
+          final today = DateTime.now();
+          bool future(DateTime d) =>
+              d.isAfter(DateTime(today.year, today.month, today.day));
+          final horizon = DateTime(
+            today.year,
+            today.month,
+            today.day,
+          ).add(const Duration(days: 120));
+          for (final it in items) {
+            if (it.start == WhenStart.anytime &&
+                it.startDate != null &&
+                future(it.startDate!)) {
+              entries.add(ScheduleEntry(it, it.startDate!));
+            }
+            if (it.deadline != null && future(it.deadline!)) {
+              entries.add(ScheduleEntry(it, it.deadline!, isDeadline: true));
+            }
+            // 重复任务：在未来日期上排出半透明影子预视。
+            if (it.isRepeating && it.startDate != null) {
+              var d = it.startDate!;
+              for (var i = 0; i < 12; i++) {
+                final n = it.repeat.next(d, it.repeatInterval);
+                if (n == null || n.isAfter(horizon)) break;
+                d = n;
+                if (future(d)) {
+                  entries.add(ScheduleEntry(it, d, isShadow: true));
+                }
+              }
+            }
           }
-        }
-      }
-      entries.sort((a, b) => a.date.compareTo(b.date));
-      return entries;
-    });
+          entries.sort((a, b) => a.date.compareTo(b.date));
+          return entries;
+        });
   }
 
   /// 随时：anytime 且不被安排在未来（无日期或已到期）。含今天的任务。
   Stream<List<Item>> watchAnytime() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeListable
         AND start = 'anytime'
         AND (start_date IS NULL OR start_date <= date('now','localtime'))
       ORDER BY sort_order ASC, created_at DESC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 将来：冷冻库（start = someday），灰显。
   Stream<List<Item>> watchSomeday() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE $_activeListable AND start = 'someday'
       ORDER BY sort_order ASC, created_at DESC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 日志：已完成 / 已取消的任务与项目，按完成时间降序。
   Stream<List<Item>> watchLogbook() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE type IN ('task','project')
         AND status IN ('completed','canceled')
         AND trashed = 0
       ORDER BY completed_at DESC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 垃圾站。
   Stream<List<Item>> watchTrash() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items WHERE trashed = 1 ORDER BY updated_at DESC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 某个项目下的活跃任务与标题（用于项目详情页，按标题分组）。
   /// 已归档的标题（archived=1）连同其下任务都不在此列出。
   Stream<List<Item>> watchProjectItems(String projectId) {
-    return db.watch('''
+    return db
+        .watch(
+          '''
       SELECT * FROM items
       WHERE project_id = ? AND trashed = 0
         AND type IN ('task','heading')
@@ -741,18 +967,27 @@ class ItemRepository {
               SELECT id FROM items WHERE type = 'heading' AND COALESCE(archived,0) = 1
             ))
       ORDER BY sort_order ASC, created_at ASC
-    ''', parameters: [projectId]).map(_map);
+    ''',
+          parameters: [projectId],
+        )
+        .map(_map);
   }
 
   /// 归档 / 取消归档一个标题。
   Future<void> setHeadingArchived(String id, bool archived) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET archived = ?, updated_at = ? WHERE id = ?
-    ''', [archived ? 1 : 0, DateTime.now().toIso8601String(), id]);
+    ''',
+      [archived ? 1 : 0, DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 按给定顺序持久化一批条目的 sort_order（拖拽排序后调用）。
-  Future<void> reorder(List<String> idsInOrder, {bool todayOrder = false}) async {
+  Future<void> reorder(
+    List<String> idsInOrder, {
+    bool todayOrder = false,
+  }) async {
     final col = todayOrder ? 'today_sort_order' : 'sort_order';
     final now = DateTime.now().toIso8601String();
     await db.writeTransaction((tx) async {
@@ -767,25 +1002,32 @@ class ItemRepository {
 
   /// 把一个任务移动到某个标题下（或移出标题：headingId=null）。
   Future<void> assignHeading(String id, String? headingId) async {
-    await db.execute('''
+    await db.execute(
+      '''
       UPDATE items SET heading_id = ?, updated_at = ? WHERE id = ?
-    ''', [headingId, DateTime.now().toIso8601String(), id]);
+    ''',
+      [headingId, DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// 领域列表。
   Stream<List<Area>> watchAreas() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM areas ORDER BY sort_order ASC
-    ''').map((rows) => rows.map((r) => Area.fromRow(r)).toList());
+    ''')
+        .map((rows) => rows.map((r) => Area.fromRow(r)).toList());
   }
 
   /// 所有活跃项目（侧边栏/主列表用）。
   Stream<List<Item>> watchProjects() {
-    return db.watch('''
+    return db
+        .watch('''
       SELECT * FROM items
       WHERE type = 'project' AND status = 'open' AND trashed = 0
       ORDER BY sort_order ASC
-    ''').map(_map);
+    ''')
+        .map(_map);
   }
 
   /// 一次性取出全部活跃（open、未删除）的任务与项目，供「一键回顾」在内存中分类。
@@ -799,18 +1041,23 @@ class ItemRepository {
 
   /// 项目进度（活跃 + 已完成任务的比例）。
   Stream<ProjectProgress> watchProjectProgress(String projectId) {
-    return db.watch('''
+    return db
+        .watch(
+          '''
       SELECT
         COUNT(*) AS total,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS done
       FROM items
       WHERE project_id = ? AND type = 'task' AND trashed = 0
         AND status != 'canceled'
-    ''', parameters: [projectId]).map((rows) {
-      final row = rows.first;
-      final total = (row['total'] as int?) ?? 0;
-      final done = (row['done'] as int?) ?? 0;
-      return ProjectProgress(total, done);
-    });
+    ''',
+          parameters: [projectId],
+        )
+        .map((rows) {
+          final row = rows.first;
+          final total = (row['total'] as int?) ?? 0;
+          final done = (row['done'] as int?) ?? 0;
+          return ProjectProgress(total, done);
+        });
   }
 }

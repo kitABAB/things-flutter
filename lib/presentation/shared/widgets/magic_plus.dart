@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../screens/ai_conversation_capture_screen.dart';
 import '../theme/app_theme.dart';
 import 'add_edit_item_modal.dart';
 import 'when_picker_sheet.dart';
@@ -204,6 +205,21 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
     );
   }
 
+  void _openAiCapture() {
+    final ctx = MagicPlusController.instance.active.value;
+    Navigator.of(_navContext).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(
+          name: MagicPlusNavObserver.hidePlusRouteName,
+        ),
+        builder: (_) => AiConversationCaptureScreen(
+          projectId: ctx.projectId,
+          headingId: ctx.headingId,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -304,6 +320,14 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
         // 右下角加号
         Positioned(
           right: 16,
+          bottom: 82 + mq.padding.bottom,
+          child: _AiPill(onTap: _openAiCapture)
+              .animate()
+              .fadeIn(duration: 160.ms)
+              .slideY(begin: 0.12, curve: Curves.easeOutCubic),
+        ),
+        Positioned(
+          right: 16,
           bottom: 16 + mq.padding.bottom,
           child: LongPressDraggable<int>(
             data: 1,
@@ -367,6 +391,61 @@ class _GlobalMagicPlusState extends State<GlobalMagicPlus> {
           ),
         );
       },
+    );
+  }
+}
+
+class _AiPill extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AiPill({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: AppTheme.primaryBlue.withValues(alpha: 0.16),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.13),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome_rounded,
+                color: AppTheme.primaryBlue,
+                size: 18,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'AI',
+                style: TextStyle(
+                  color: AppTheme.primaryBlue,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

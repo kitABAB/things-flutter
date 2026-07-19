@@ -15,7 +15,7 @@ abstract class LlmClient {
     List<LlmMessage> messages, {
     bool jsonMode = false,
     double temperature = 0.2,
-    Duration timeout = const Duration(seconds: 20),
+    Duration timeout = const Duration(seconds: 45),
   });
 
   /// 当前是否具备调用条件（主要看 API Key 是否就绪），供 UI 决定是否点亮入口。
