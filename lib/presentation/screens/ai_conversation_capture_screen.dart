@@ -610,6 +610,31 @@ class _AiConversationCaptureScreenState
   Widget build(BuildContext context) {
     final aiEnabled = ref.watch(aiEnabledProvider);
     final media = MediaQuery.of(context);
+    final desktop = media.size.width >= 900;
+    final content = Column(
+      children: [
+        Expanded(
+          child: ListView(
+            controller: _scroll,
+            padding: EdgeInsets.fromLTRB(
+              16,
+              10,
+              16,
+              math.max(12, media.viewInsets.bottom > 0 ? 8 : 16),
+            ),
+            children: [
+              if (_lines.isEmpty && _drafts.isEmpty) _emptyState(aiEnabled),
+              for (final line in _lines) _message(line),
+              if (_thinking) const _TypingBubble(),
+              if (_drafts.isNotEmpty) _draftSection(),
+            ],
+          ),
+        ),
+        if (_drafts.isNotEmpty) _commitBar(),
+        _suggestionRow(),
+        _composer(aiEnabled),
+      ],
+    );
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
           ? const Color(0xFF111113)
@@ -637,29 +662,14 @@ class _AiConversationCaptureScreenState
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                controller: _scroll,
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  10,
-                  16,
-                  math.max(12, media.viewInsets.bottom > 0 ? 8 : 16),
-                ),
-                children: [
-                  if (_lines.isEmpty && _drafts.isEmpty) _emptyState(aiEnabled),
-                  for (final line in _lines) _message(line),
-                  if (_thinking) const _TypingBubble(),
-                  if (_drafts.isNotEmpty) _draftSection(),
-                ],
-              ),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: desktop ? 980 : double.infinity,
             ),
-            if (_drafts.isNotEmpty) _commitBar(),
-            _suggestionRow(),
-            _composer(aiEnabled),
-          ],
+            child: content,
+          ),
         ),
       ),
     );

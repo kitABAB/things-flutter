@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../ai/ai_providers.dart';
@@ -8,6 +9,7 @@ import '../../ai/config/model_connection.dart';
 import '../../ai/core/llm_exception.dart';
 import '../../ai/core/llm_message.dart';
 import '../../ai/providers/openai_compat_client.dart';
+import '../desktop/quick_capture/desktop_quick_capture_controller.dart';
 import '../shared/theme/app_theme.dart';
 import '../shared/widgets/magic_plus.dart';
 
@@ -533,6 +535,8 @@ class _AiDesktopAside extends StatelessWidget {
             label: batchTesting ? '测试中' : '批量测试',
             onTap: batchTesting ? null : onBatchTest,
           ),
+          const SizedBox(height: 12),
+          const _DesktopQuickCaptureShortcutCard(),
           const Spacer(),
           Text(
             'OpenAI-compatible',
@@ -542,6 +546,232 @@ class _AiDesktopAside extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DesktopQuickCaptureShortcutCard extends StatelessWidget {
+  const _DesktopQuickCaptureShortcutCard();
+
+  Future<void> _record(BuildContext context) async {
+    final controller = DesktopQuickCaptureController.instance;
+    final hotKey = await showDialog<HotKey>(
+      context: context,
+      builder: (_) => _ShortcutRecorderDialog(
+        initialHotKey: controller.settings.value.hotKey,
+      ),
+    );
+    if (hotKey == null) return;
+    final ok = await controller.setHotKey(hotKey);
+    if (!context.mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('快捷键至少需要一个修饰键'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!DesktopQuickCaptureController.isSupported) {
+      return const SizedBox.shrink();
+    }
+    final controller = DesktopQuickCaptureController.instance;
+    return ValueListenableBuilder<DesktopQuickCaptureSettings>(
+      valueListenable: controller.settings,
+      builder: (context, settings, _) {
+        final label = DesktopQuickCaptureSettings.labelFor(settings.hotKey);
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: _AiPalette.control(context).withValues(alpha: 0.62),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _AiPalette.line(context)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.keyboard_command_key_rounded,
+                    size: 17,
+                    color: _AiPalette.muted(context),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '快捷捕获',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Switch(
+                    value: settings.enabled,
+                    onChanged: controller.setEnabled,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => _record(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: _AiPalette.panel(context),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _AiPalette.line(context)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'monospace',
+                              ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.edit_rounded,
+                        size: 16,
+                        color: _AiPalette.muted(context),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              ValueListenableBuilder<String?>(
+                valueListenable: controller.lastError,
+                builder: (context, error, _) {
+                  if (error == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      error,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.deadlineRed,
+                        fontSize: 11,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ShortcutRecorderDialog extends StatefulWidget {
+  final HotKey initialHotKey;
+
+  const _ShortcutRecorderDialog({required this.initialHotKey});
+
+  @override
+  State<_ShortcutRecorderDialog> createState() =>
+      _ShortcutRecorderDialogState();
+}
+
+class _ShortcutRecorderDialogState extends State<_ShortcutRecorderDialog> {
+  late HotKey _hotKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _hotKey = widget.initialHotKey;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = DesktopQuickCaptureSettings.hasModifier(_hotKey);
+    return Dialog(
+      insetPadding: const EdgeInsets.all(32),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '录入快捷键',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                height: 74,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _AiPalette.control(context),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: valid
+                        ? AppTheme.primaryBlue.withValues(alpha: 0.22)
+                        : AppTheme.deadlineRed.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: HotKeyRecorder(
+                  initalHotKey: _hotKey,
+                  onHotKeyRecorded: (hotKey) {
+                    setState(() {
+                      _hotKey = DesktopQuickCaptureSettings.normalizeHotKey(
+                        hotKey,
+                      );
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                valid ? '按下新的组合键后保存' : '至少包含 Ctrl / Alt / Shift / Cmd',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: valid
+                      ? _AiPalette.muted(context)
+                      : AppTheme.deadlineRed,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('取消'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: valid
+                        ? () => Navigator.of(context).pop(_hotKey)
+                        : null,
+                    child: const Text('保存'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

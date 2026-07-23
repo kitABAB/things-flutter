@@ -6,6 +6,8 @@ import 'data/database/powersync_db.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/sync_service.dart';
 import 'data/services/today_widget_service.dart';
+import 'presentation/desktop/quick_capture/desktop_quick_capture_controller.dart';
+import 'presentation/desktop/quick_capture/desktop_quick_capture_overlay.dart';
 import 'presentation/shared/theme/app_theme.dart';
 import 'presentation/shared/widgets/magic_plus.dart';
 import 'presentation/layouts/responsive_layout.dart';
@@ -19,12 +21,9 @@ void main() async {
   await NotificationService.instance.init();
   await SyncService.instance.load();
   await TodayWidgetService.instance.init();
+  await DesktopQuickCaptureController.instance.init();
 
-  runApp(
-    const ProviderScope(
-      child: Things3CloneApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: Things3CloneApp()));
 }
 
 class Things3CloneApp extends StatefulWidget {
@@ -49,7 +48,9 @@ class _Things3CloneAppState extends State<Things3CloneApp>
       SyncService.instance.sync();
     });
     _autoSync = Timer.periodic(
-        const Duration(seconds: 60), (_) => SyncService.instance.sync());
+      const Duration(seconds: 60),
+      (_) => SyncService.instance.sync(),
+    );
   }
 
   @override
@@ -80,10 +81,13 @@ class _Things3CloneAppState extends State<Things3CloneApp>
         // 让运行时中性色 getter 跟随当前亮度。
         AppTheme.isDark = Theme.of(context).brightness == Brightness.dark;
         // 全局常驻「魔法加号」：浮在 Navigator 之上，跨页面持续存在。
-        return GlobalMagicPlus(
+        return DesktopQuickCaptureOverlay(
           navigatorKey: _navKey,
-          observer: _magicObserver,
-          child: child ?? const SizedBox.shrink(),
+          child: GlobalMagicPlus(
+            navigatorKey: _navKey,
+            observer: _magicObserver,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       home: const DeepLinkHost(child: ResponsiveLayout()),

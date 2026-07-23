@@ -70,7 +70,9 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
         settings: const RouteSettings(
           name: MagicPlusNavObserver.hidePlusRouteName,
         ),
-        builder: (_) => const AiConversationCaptureScreen(),
+        builder: (_) => AiConversationCaptureScreen(
+          projectId: _selection.isProject ? _selection.projectId : null,
+        ),
       ),
     );
   }
@@ -96,6 +98,7 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
         ch.trim().isNotEmpty &&
         !HardwareKeyboard.instance.isControlPressed &&
         !HardwareKeyboard.instance.isMetaPressed &&
+        !HardwareKeyboard.instance.isAltPressed &&
         ch.codeUnitAt(0) >= 0x20) {
       _openSearch(initial: ch);
       return KeyEventResult.handled;
