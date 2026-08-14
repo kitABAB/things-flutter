@@ -141,6 +141,144 @@ class ItemRepository {
     return id;
   }
 
+  /// 复制任务、标题或项目，并返回新条目的 id。
+  ///
+  /// 复制只创建一个新的开放实例：保留安排、死线、提醒和标签，
+  /// 检查项会复制为未完成状态；不会复制原条目的完成/取消状态或回收站状态。
+  Future<String?> duplicateItem(String id) async {
+    final rows = await db.getAll('SELECT * FROM items WHERE id = ?', [id]);
+    if (rows.isEmpty) return null;
+    final item = Item.fromRow(rows.first as Map<String, dynamic>);
+
+    switch (item.type) {
+      case ItemType.task:
+        return _duplicateTask(item);
+      case ItemType.heading:
+        return _duplicateHeading(item);
+      case ItemType.project:
+        return _duplicateProject(item);
+    }
+  }
+
+  Future<String> _duplicateTask(Item item, {String? projectId, String? headingId}) async {
+    final newId = await createTask(
+      title: item.title,
+      start: item.start,
+      startDate: item.startDate,
+      evening: item.evening,
+      deadline: item.deadline,
+      repeat: item.repeat,
+      repeatInterval: item.repeatInterval,
+      reminderTime: item.reminderTime,
+      areaId: item.areaId,
+      projectId: projectId ?? item.projectId,
+      headingId: headingId ?? item.headingId,
+    );
+    await _copyTags(item.id, newId);
+    await _copyChecklist(item.id, newId);
+    return newId;
+  }
+
+  Future<String> _duplicateHeading(Item item) async {
+    final projectId = item.projectId;
+    if (projectId == null) return item.id;
+    final newId = await createHeading(title: item.title, projectId: projectId);
+    final children = await db.getAll(
+      '''
+      SELECT * FROM items
+      WHERE heading_id = ? AND type = 'task' AND trashed = 0
+      ORDER BY sort_order ASC
+      ''',
+      [item.id],
+    );
+    for (final row in children) {
+      await _duplicateTask(
+        Item.fromRow(row as Map<String, dynamic>),
+        projectId: projectId,
+        headingId: newId,
+      );
+    }
+    await _copyTags(item.id, newId);
+    return newId;
+  }
+
+  Future<String> _duplicateProject(Item item) async {
+    final projectId = await createProject(
+      title: item.title,
+      areaId: item.areaId,
+      start: item.start == WhenStart.inbox ? WhenStart.anytime : item.start,
+    );
+    await setWhen(
+      projectId,
+      start: item.start == WhenStart.inbox ? WhenStart.anytime : item.start,
+      startDate: item.startDate,
+      evening: item.evening,
+    );
+    await setDeadline(projectId, item.deadline);
+    await setRepeat(
+      projectId,
+      item.repeat,
+      interval: item.repeatInterval,
+    );
+    if (item.reminderTime != null) {
+      await setReminder(projectId, item.reminderTime);
+    }
+    await _copyTags(item.id, projectId);
+
+    final children = await db.getAll(
+      '''
+      SELECT * FROM items
+      WHERE project_id = ? AND type IN ('heading','task') AND trashed = 0
+      ORDER BY sort_order ASC
+      ''',
+      [item.id],
+    );
+    final headingIds = <String, String>{};
+    for (final row in children) {
+      final child = Item.fromRow(row as Map<String, dynamic>);
+      if (child.isHeading) {
+        final newHeading = await createHeading(
+          title: child.title,
+          projectId: projectId,
+        );
+        headingIds[child.id] = newHeading;
+        await _copyTags(child.id, newHeading);
+      }
+    }
+    for (final row in children) {
+      final child = Item.fromRow(row as Map<String, dynamic>);
+      if (!child.isTask) continue;
+      await _duplicateTask(
+        child,
+        projectId: projectId,
+        headingId: child.headingId == null
+            ? null
+            : headingIds[child.headingId],
+      );
+    }
+    return projectId;
+  }
+
+  Future<void> _copyTags(String sourceId, String targetId) async {
+    final rows = await db.getAll(
+      'SELECT tag_id FROM item_tags WHERE item_id = ?',
+      [sourceId],
+    );
+    for (final row in rows) {
+      await attachTag(targetId, row['tag_id'] as String);
+    }
+  }
+
+  Future<void> _copyChecklist(String sourceId, String targetId) async {
+    final rows = await db.getAll(
+      'SELECT title FROM checklist_items WHERE item_id = ? ORDER BY sort_order ASC',
+      [sourceId],
+    );
+    for (final row in rows) {
+      await addChecklistItem(targetId, row['title'] as String);
+    }
+  }
+
   Future<void> deleteArea(String id) async {
     final now = DateTime.now().toIso8601String();
     final tagRows = await db.getAll(

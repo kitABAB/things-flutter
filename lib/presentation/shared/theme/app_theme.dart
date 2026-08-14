@@ -10,6 +10,15 @@ class AppTheme {
   // Things 3 的标志性强调蓝（偏深、非青），用于链接 / 复选框 / 项目环。
   static const Color primaryBlue = Color(0xFF2D7DF6);
 
+  // 桌面端窗口令牌：保持 Things 3 的浅灰侧栏、白色画布和紧凑工具栏层级。
+  // 这些令牌只用于 desktop widgets，避免改变移动端的布局密度。
+  static const double desktopSidebarWidth = 264;
+  static const double desktopTopBarHeight = 52;
+  static const double desktopBottomBarHeight = 54;
+  static const double desktopCornerRadius = 10;
+  static const Color desktopSidebarSelection = Color(0xFFDCDDE1);
+  static const Color desktopHover = Color(0xFFE8E8EB);
+
   // 语义色（深浅通用）—— 对齐 Things 3 配色
   static const Color todayYellow = Color(0xFFFAC51C); // 今天金星
   static const Color eveningIndigo = Color(0xFF5B6CF0); // 今晚靛蓝
@@ -27,6 +36,10 @@ class AppTheme {
       isDark ? const Color(0xFF161618) : const Color(0xFFF0F0F3);
   static Color get dividerColor =>
       isDark ? const Color(0xFF2C2C2E) : const Color(0xFFEDEDF0);
+  static Color get desktopSurface =>
+      isDark ? const Color(0xFF1E1E20) : Colors.white;
+  static Color get desktopSidebarSelectionColor =>
+      isDark ? const Color(0xFF353538) : desktopSidebarSelection;
 
   static ThemeData get lightTheme => _build(Brightness.light);
   static ThemeData get darkTheme => _build(Brightness.dark);

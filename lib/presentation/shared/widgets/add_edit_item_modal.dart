@@ -221,10 +221,12 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
     // 计算归属
     String? areaId;
     String? projectId;
+    String? headingId = widget.headingId;
     bool toInbox = false;
     if (_list != null) {
       areaId = _list!.areaId;
       projectId = _list!.projectId;
+      headingId = _list!.headingId ?? widget.headingId;
       toInbox = _list!.inbox;
     } else {
       projectId = _contextProjectId;
@@ -256,6 +258,9 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
           toInbox: toInbox,
           currentStart: widget.existing!.start,
         );
+        if (headingId != null && !toInbox) {
+          await repo.assignHeading(id, headingId);
+        }
       }
     } else {
       final newId = await repo.createTask(
@@ -267,7 +272,7 @@ class _AddEditItemModalState extends ConsumerState<AddEditItemModal> {
         reminderTime: _when.reminderTime,
         areaId: areaId,
         projectId: projectId,
-        headingId: widget.headingId,
+        headingId: headingId,
       );
       for (final tagId in _tagIds) {
         await repo.attachTag(newId, tagId);

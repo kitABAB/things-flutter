@@ -75,16 +75,23 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
         actions: [
           PopupMenuButton<String>(
             icon: Icon(Icons.more_horiz, color: AppTheme.textSecondary),
-            onSelected: (v) {
+            onSelected: (v) async {
               if (v == 'cancel') {
                 repo.setStatus(_id, ItemStatus.canceled);
                 Navigator.of(context).maybePop();
+              } else if (v == 'duplicate') {
+                final newId = await repo.duplicateItem(_id);
+                if (!context.mounted || newId == null) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('任务已复制')),
+                );
               } else if (v == 'trash') {
                 repo.moveToTrash(_id);
                 Navigator.of(context).maybePop();
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'duplicate', child: Text('复制任务')),
               PopupMenuItem(value: 'cancel', child: Text('取消任务（划掉）')),
               PopupMenuItem(value: 'trash', child: Text('删除到垃圾桶')),
             ],
@@ -189,6 +196,9 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                   toInbox: t.inbox,
                   currentStart: item.start,
                 );
+                if (t.headingId != null && !t.inbox) {
+                  await repo.assignHeading(_id, t.headingId);
+                }
               }
             },
           ),

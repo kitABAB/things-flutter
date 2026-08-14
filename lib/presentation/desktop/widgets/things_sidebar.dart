@@ -46,7 +46,7 @@ class ThingsSidebar extends ConsumerWidget {
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
+          padding: const EdgeInsets.fromLTRB(10, 18, 10, 18),
           children: [
             _sidebarHeader(context, ref),
             const SizedBox(height: 14),
@@ -64,9 +64,15 @@ class ThingsSidebar extends ConsumerWidget {
               ),
             for (final area in areas) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 4, 4),
+                padding: const EdgeInsets.fromLTRB(10, 10, 4, 4),
                 child: Row(
                   children: [
+                    Icon(
+                      Icons.folder_open_rounded,
+                      size: 16,
+                      color: AppTheme.textSecondary,
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         area.title,
@@ -91,7 +97,10 @@ class ThingsSidebar extends ConsumerWidget {
                 ),
               ),
               for (final p in projects.where((p) => p.areaId == area.id))
-                _projectItem(context, p.id, p.title),
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: _projectItem(context, p.id, p.title),
+                ),
             ],
             for (final p in projects.where((p) => p.areaId == null))
               _projectItem(context, p.id, p.title),
@@ -131,7 +140,7 @@ class ThingsSidebar extends ConsumerWidget {
             child: const Icon(
               Icons.check_rounded,
               color: AppTheme.primaryBlue,
-              size: 20,
+              size: 18,
             ),
           ),
           const SizedBox(width: 10),
@@ -139,7 +148,7 @@ class ThingsSidebar extends ConsumerWidget {
             child: Text(
               'Things',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontSize: 19,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0,
               ),
@@ -185,15 +194,15 @@ class ThingsSidebar extends ConsumerWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: AppTheme.textSecondary),
-            const SizedBox(width: 12),
+            Icon(icon, size: 19, color: AppTheme.textSecondary),
+            const SizedBox(width: 10),
             Text(
               label,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                fontSize: 14,
+                fontSize: 15,
                 color: AppTheme.textSecondary,
               ),
             ),
@@ -208,11 +217,11 @@ class ThingsSidebar extends ConsumerWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         child: Row(
           children: [
             Icon(Icons.add, size: 18, color: AppTheme.textSecondary),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Text(
               label,
               style: Theme.of(
@@ -276,23 +285,23 @@ class ThingsSidebar extends ConsumerWidget {
         duration: const Duration(milliseconds: 130),
         curve: Curves.easeOutCubic,
         margin: const EdgeInsets.symmetric(vertical: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primaryBlue.withValues(alpha: 0.09)
+              ? AppTheme.desktopSidebarSelectionColor
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(9),
         ),
         child: Row(
           children: [
             leading,
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  fontSize: 15,
+                  fontSize: 15.5,
                   color: AppTheme.textPrimary,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

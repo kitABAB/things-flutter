@@ -16,19 +16,20 @@ import '../../shared/theme/app_theme.dart';
 import '../../shared/utils/date_format.dart';
 import '../../shared/widgets/add_edit_item_modal.dart';
 import '../../shared/widgets/magic_plus.dart';
+import '../../shared/widgets/move_target_sheet.dart';
 import '../../shared/widgets/tag_picker_sheet.dart';
 import '../../shared/widgets/things_checkbox.dart';
 import '../../shared/widgets/when_picker_sheet.dart';
 import '../widgets/things_sidebar.dart';
 
-class DesktopMainLayout extends StatefulWidget {
+class DesktopMainLayout extends ConsumerStatefulWidget {
   const DesktopMainLayout({super.key});
 
   @override
-  State<DesktopMainLayout> createState() => _DesktopMainLayoutState();
+  ConsumerState<DesktopMainLayout> createState() => _DesktopMainLayoutState();
 }
 
-class _DesktopMainLayoutState extends State<DesktopMainLayout> {
+class _DesktopMainLayoutState extends ConsumerState<DesktopMainLayout> {
   SidebarSelection _selection = const SidebarSelection.system(AppView.today);
   bool _slim = false;
   String? _inspectedItemId;
@@ -77,6 +78,83 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
     );
   }
 
+  void _openNewTask() {
+    WhenChoice? defaultWhen;
+    if (!_selection.isProject) {
+      switch (_selection.view ?? AppView.today) {
+        case AppView.today:
+          defaultWhen = WhenChoice.today;
+        case AppView.anytime:
+        case AppView.upcoming:
+          defaultWhen = WhenChoice.anytime;
+        case AppView.someday:
+          defaultWhen = WhenChoice.someday;
+        case AppView.inbox:
+        case AppView.logbook:
+          defaultWhen = WhenChoice.inbox;
+      }
+    }
+    AddEditItemModal.pushCreate(
+      context,
+      defaultWhen: defaultWhen,
+      projectId: _selection.isProject ? _selection.projectId : null,
+    );
+  }
+
+  void _openQuickEntry() {
+    AddEditItemModal.pushCreate(
+      context,
+      defaultWhen: WhenChoice.inbox,
+    );
+  }
+
+  Future<Item?> _inspectedItem() async {
+    final id = _inspectedItemId;
+    if (id == null) return null;
+    return ref.read(itemProvider(id).future);
+  }
+
+  Future<void> _toggleInspectedComplete() async {
+    final item = await _inspectedItem();
+    if (item == null) return;
+    await ref.read(itemRepositoryProvider).toggleComplete(item.id, !item.isCompleted);
+  }
+
+  Future<void> _scheduleInspected() async {
+    final item = await _inspectedItem();
+    if (item == null || !mounted) return;
+    await WhenPickerSheet.apply(context, ref, item.id);
+  }
+
+  Future<void> _moveInspected() async {
+    final item = await _inspectedItem();
+    if (item == null || !mounted) return;
+    final target = await MoveTargetSheet.show(context);
+    if (target == null) return;
+    await ref.read(itemRepositoryProvider).assignParent(
+      item.id,
+      areaId: target.areaId,
+      projectId: target.projectId,
+      toInbox: target.inbox,
+      currentStart: item.start,
+    );
+    if (target.headingId != null && !target.inbox) {
+      await ref
+          .read(itemRepositoryProvider)
+          .assignHeading(item.id, target.headingId);
+    }
+  }
+
+  Future<void> _duplicateInspected() async {
+    final item = await _inspectedItem();
+    if (item == null) return;
+    final newId = await ref.read(itemRepositoryProvider).duplicateItem(item.id);
+    if (!mounted || newId == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${item.isProject ? '项目' : '任务'}已复制')),
+    );
+  }
+
   void _select(SidebarSelection selection) {
     setState(() {
       _selection = selection;
@@ -110,13 +188,37 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
   Widget build(BuildContext context) {
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
-            AddEditItemModal.pushCreate(context),
-        const SingleActivator(LogicalKeyboardKey.keyN, control: true): () =>
-            AddEditItemModal.pushCreate(context),
+        const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+            _openNewTask,
+        const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+            _openNewTask,
         const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _openSearch,
         const SingleActivator(LogicalKeyboardKey.keyF, control: true):
             _openSearch,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+            _toggleInspectedComplete,
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+            _toggleInspectedComplete,
+        const SingleActivator(
+          LogicalKeyboardKey.keyM,
+          meta: true,
+          shift: true,
+        ): _moveInspected,
+        const SingleActivator(
+          LogicalKeyboardKey.keyM,
+          control: true,
+          shift: true,
+        ): _moveInspected,
+        const SingleActivator(
+          LogicalKeyboardKey.keyD,
+          meta: true,
+          shift: true,
+        ): _duplicateInspected,
+        const SingleActivator(
+          LogicalKeyboardKey.keyD,
+          control: true,
+          shift: true,
+        ): _duplicateInspected,
         const SingleActivator(LogicalKeyboardKey.backslash, meta: true): () =>
             setState(() => _slim = !_slim),
         const SingleActivator(
@@ -130,11 +232,11 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
         onKeyEvent: _onKey,
         autofocus: true,
         child: Scaffold(
-          backgroundColor: AppTheme.backgroundLight,
+          backgroundColor: AppTheme.desktopSurface,
           body: Row(
             children: [
               AnimatedContainer(
-                width: _slim ? 0 : 268,
+                width: _slim ? 0 : AppTheme.desktopSidebarWidth,
                 duration: const Duration(milliseconds: 190),
                 curve: Curves.easeOutCubic,
                 child: _slim
@@ -149,14 +251,27 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
                       child: Row(
                         children: [
                           Expanded(child: _workspace(context)),
-                          _DesktopInspector(
-                            itemId: _inspectedItemId,
-                            selection: _selection,
-                            onClear: () =>
-                                setState(() => _inspectedItemId = null),
-                          ),
+                          if (_inspectedItemId != null)
+                            _DesktopInspector(
+                              itemId: _inspectedItemId,
+                              selection: _selection,
+                              onClear: () =>
+                                  setState(() => _inspectedItemId = null),
+                            ),
                         ],
                       ),
+                    ),
+                    _DesktopBottomToolbar(
+                      itemId: _inspectedItemId,
+                      onNew: _openNewTask,
+                      onQuickEntry: _openQuickEntry,
+                      onComplete: _toggleInspectedComplete,
+                      onWhen: _scheduleInspected,
+                      onMove: _moveInspected,
+                      onDuplicate: _duplicateInspected,
+                      onSearch: _openSearch,
+                      onUpcoming: () =>
+                          _select(const SidebarSelection.system(AppView.upcoming)),
                     ),
                   ],
                 ),
@@ -170,10 +285,10 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
 
   Widget _topBar(BuildContext context) {
     return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      height: AppTheme.desktopTopBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppTheme.desktopSurface,
         border: Border(bottom: BorderSide(color: AppTheme.dividerColor)),
       ),
       child: Row(
@@ -221,11 +336,6 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
             onPressed: _openAiCapture,
           ),
           const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: () => AddEditItemModal.pushCreate(context),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('新建'),
-          ),
         ],
       ),
     );
@@ -249,23 +359,13 @@ class _DesktopMainLayoutState extends State<DesktopMainLayout> {
             onInspectItem: _inspect,
           );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 16, 12, 18),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border.all(color: AppTheme.dividerColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeOutCubic,
-            child: child,
-          ),
-        ),
+    return DecoratedBox(
+      decoration: BoxDecoration(color: AppTheme.desktopSurface),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 160),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        child: child,
       ),
     );
   }
@@ -293,6 +393,124 @@ class _ToolbarIcon extends StatelessWidget {
   }
 }
 
+class _DesktopBottomToolbar extends ConsumerWidget {
+  final String? itemId;
+  final VoidCallback onNew;
+  final VoidCallback onQuickEntry;
+  final VoidCallback onComplete;
+  final VoidCallback onWhen;
+  final VoidCallback onMove;
+  final VoidCallback onDuplicate;
+  final VoidCallback onSearch;
+  final VoidCallback onUpcoming;
+
+  const _DesktopBottomToolbar({
+    required this.itemId,
+    required this.onNew,
+    required this.onQuickEntry,
+    required this.onComplete,
+    required this.onWhen,
+    required this.onMove,
+    required this.onDuplicate,
+    required this.onSearch,
+    required this.onUpcoming,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasSelection = itemId != null;
+    final item = hasSelection
+        ? ref.watch(itemProvider(itemId!)).value
+        : null;
+
+    Widget button({
+      required IconData icon,
+      required String label,
+      required VoidCallback onPressed,
+      bool enabled = true,
+      Color? tint,
+    }) {
+      return Tooltip(
+        message: label,
+        child: IconButton(
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(icon, size: 21),
+          color: tint ?? AppTheme.textSecondary,
+        ),
+      );
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      height: AppTheme.desktopBottomBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.desktopSurface,
+        border: Border(
+          top: BorderSide(
+            color: hasSelection
+                ? AppTheme.primaryBlue.withValues(alpha: 0.35)
+                : AppTheme.dividerColor,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  button(
+                    icon: Icons.add_rounded,
+                    label: '新建待办',
+                    onPressed: onNew,
+                    tint: AppTheme.primaryBlue,
+                  ),
+                  button(
+                    icon: Icons.inbox_rounded,
+                    label: '快速捕获',
+                    onPressed: onQuickEntry,
+                  ),
+                  if (hasSelection) ...[
+                    button(
+                      icon: Icons.check_circle_outline_rounded,
+                      label: item?.isCompleted == true ? '重新打开' : '完成',
+                      onPressed: onComplete,
+                    ),
+                    button(
+                      icon: Icons.calendar_today_rounded,
+                      label: '计划',
+                      onPressed: onWhen,
+                    ),
+                    button(
+                      icon: Icons.drive_file_move_outline,
+                      label: '移动',
+                      onPressed: onMove,
+                    ),
+                    button(
+                      icon: Icons.content_copy_rounded,
+                      label: '复制',
+                      onPressed: onDuplicate,
+                    ),
+                  ] else
+                    button(
+                      icon: Icons.calendar_today_rounded,
+                      label: '计划',
+                      onPressed: onUpcoming,
+                    ),
+                ],
+              ),
+            ),
+          ),
+          button(icon: Icons.search_rounded, label: '搜索', onPressed: onSearch),
+        ],
+      ),
+    );
+  }
+}
+
 class _DesktopInspector extends ConsumerWidget {
   final String? itemId;
   final SidebarSelection selection;
@@ -307,12 +525,12 @@ class _DesktopInspector extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      width: 332,
-      margin: const EdgeInsets.fromLTRB(0, 16, 16, 18),
+      width: 304,
+      margin: const EdgeInsets.fromLTRB(12, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: AppTheme.desktopSurface,
         border: Border.all(color: AppTheme.dividerColor),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppTheme.desktopCornerRadius),
       ),
       child: itemId == null
           ? _InspectorEmpty(selection: selection)

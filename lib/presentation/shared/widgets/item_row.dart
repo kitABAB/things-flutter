@@ -34,6 +34,9 @@ class ItemRow extends ConsumerWidget {
   final bool selected;
   final ValueChanged<Item>? onToggleSelect;
 
+  /// 桌面端使用 Things 风格的更紧凑行高和字号。
+  final bool desktopMode;
+
   const ItemRow({
     super.key,
     required this.item,
@@ -44,6 +47,7 @@ class ItemRow extends ConsumerWidget {
     this.selectionMode = false,
     this.selected = false,
     this.onToggleSelect,
+    this.desktopMode = false,
   });
 
   @override
@@ -111,7 +115,10 @@ class ItemRow extends ConsumerWidget {
           }
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 11.0, horizontal: 8.0),
+          padding: EdgeInsets.symmetric(
+            vertical: desktopMode ? 8.0 : 11.0,
+            horizontal: desktopMode ? 10.0 : 8.0,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -119,7 +126,7 @@ class ItemRow extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 1.0),
                 child: _leading(ref),
               ),
-              const SizedBox(width: 13),
+              SizedBox(width: desktopMode ? 11 : 13),
               Expanded(child: _content(context)),
             ],
           ),
@@ -131,23 +138,40 @@ class ItemRow extends ConsumerWidget {
   Widget _selectableRow(BuildContext context) {
     return InkWell(
       onTap: () => onToggleSelect?.call(item),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
         color: selected ? AppTheme.primaryBlue.withValues(alpha: 0.08) : null,
-        padding: const EdgeInsets.symmetric(vertical: 9.0, horizontal: 8.0),
+        padding: EdgeInsets.symmetric(
+          vertical: desktopMode ? 7.0 : 9.0,
+          horizontal: desktopMode ? 10.0 : 8.0,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 1.0),
-              child: Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked,
-                color: selected ? AppTheme.primaryBlue : Colors.grey.shade400,
-                size: 22,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                transitionBuilder: (child, animation) => ScaleTransition(
+                  scale: CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutBack,
+                  ),
+                  child: child,
+                ),
+                child: Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked,
+                  key: ValueKey(selected),
+                  color: selected
+                      ? AppTheme.primaryBlue
+                      : Colors.grey.shade400,
+                  size: 22,
+                ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: desktopMode ? 11 : 12),
             Expanded(child: _content(context)),
           ],
         ),
@@ -196,6 +220,7 @@ class ItemRow extends ConsumerWidget {
               child: Text(
                 item.title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      fontSize: desktopMode ? 15.5 : null,
                       color: titleColor,
                       decoration:
                           item.isDone ? TextDecoration.lineThrough : null,
@@ -246,7 +271,7 @@ class ItemRow extends ConsumerWidget {
     if (chips.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 5.0),
+      padding: EdgeInsets.only(top: desktopMode ? 3.0 : 5.0),
       child: Wrap(spacing: 10, runSpacing: 4, children: chips),
     );
   }
@@ -259,7 +284,9 @@ class ItemRow extends ConsumerWidget {
         const SizedBox(width: 3),
         Text(label,
             style: TextStyle(
-                fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+                fontSize: desktopMode ? 11.5 : 12,
+                color: color,
+                fontWeight: FontWeight.w500)),
       ],
     );
   }

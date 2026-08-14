@@ -122,6 +122,7 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
         selectionMode: _selecting,
         selected: _selected.contains(item.id),
         onToggleSelect: _toggleSelect,
+        desktopMode: widget.desktopMode,
       ),
       item,
     );
@@ -432,6 +433,7 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
             deadlineShadow: e.isDeadline,
             onTapTask: _toggleExpand,
             onTapProject: (i) => _openProject(context, i),
+            desktopMode: widget.desktopMode,
           );
           // 真实的「计划」条目可长按拖到别的日期分组改期。
           final draggable = !e.isShadow && !e.isDeadline;
@@ -494,7 +496,12 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
 
   Widget _header(BuildContext context, {bool canSelect = false}) {
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: EdgeInsets.fromLTRB(
+        widget.desktopMode ? 28 : 16,
+        widget.desktopMode ? 20 : 12,
+        widget.desktopMode ? 28 : 16,
+        8,
+      ),
       sliver: SliverToBoxAdapter(
         child: Row(
           children: [
@@ -507,7 +514,7 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
                   onPressed: () => Navigator.of(context).maybePop(),
                 ),
               ),
-            Icon(view.icon, color: view.color, size: 32),
+            Icon(view.icon, color: view.color, size: widget.desktopMode ? 30 : 32),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -637,7 +644,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
   }) {
     final repo = ref.read(itemRepositoryProvider);
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.desktopMode ? 22 : 8,
+      ),
       sliver: SliverReorderableList(
         itemCount: items.length,
         onReorderItem: (oldIndex, newIndex) {
@@ -667,6 +676,7 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
                 showWhenDate: view == AppView.anytime,
                 onTapTask: _toggleExpand,
                 onTapProject: (i) => _openProject(context, i),
+                desktopMode: widget.desktopMode,
               ),
               it,
             ),
@@ -764,7 +774,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
     final dividerIndex = day.length;
     final total = day.length + 1 + evening.length;
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.desktopMode ? 22 : 8,
+      ),
       sliver: SliverReorderableList(
         itemCount: total,
         onReorderItem: (oldIndex, newIndex) =>
@@ -790,6 +802,7 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
                 item: it,
                 onTapTask: _toggleExpand,
                 onTapProject: (i) => _openProject(context, i),
+                desktopMode: widget.desktopMode,
               ),
               it,
             ),
@@ -897,7 +910,12 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
 
   Widget _groupHeader(BuildContext context, String label) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 2),
+      padding: EdgeInsets.fromLTRB(
+        widget.desktopMode ? 28 : 16,
+        widget.desktopMode ? 20 : 18,
+        widget.desktopMode ? 28 : 16,
+        2,
+      ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -910,7 +928,9 @@ class _ViewScreenState extends ConsumerState<ViewScreen> {
 
   Widget _flatList(BuildContext context, List<Item> items) {
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.desktopMode ? 22 : 8,
+      ),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
           final it = items[index];
